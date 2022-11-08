@@ -1,8 +1,8 @@
-import * as ecc   from 'tiny-secp256k1'
 import { Buff, Stream } from '@cmdcode/bytes-utils'
 import { Hash }   from '@cmdcode/crypto-utils'
-import KeySign    from './signer.js'
+import * as ecc   from 'tiny-secp256k1'
 import * as Utils from './utils.js'
+import KeySign    from './signer.js'
 import { KeyConfig, getConfig } from './config.js'
 
 const ec = new TextEncoder()

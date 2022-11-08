@@ -3,10 +3,13 @@
   "type": "module",
   "version": "1.0.0",
   "description": "Extention of the base BIP32 wallet spec, with extra features.",
-  "main": "dist/main.js",
-  "module": "dist/module.js",
-  "unpkg": "dist/bundle.min.js",
-  "types": "dist/types/index.d.ts",
+  "main": "./dist/main.js",
+  "unpkg": "./dist/bundle.min.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    "import": "./dist/module.js",
+    "require": "./dist/main.js"
+  },
   "repository": "https://github.com/cmdruid/hd-wallet.git",
   "author": "Christopher Scott",
   "license": "CC-BY-1.0",
@@ -18,7 +21,8 @@
     "lint": "eslint . --ext .ts",
     "tape": "node --loader ts-node/esm --no-warnings test/index.test.js",
     "test": "nyc --reporter=lcov --require ts-node/register yarn tape | tap-spec; nyc report ---reporter=text",
-    "types": "tsc"
+    "types": "tsc",
+    "release": "yarn clean && yarn types && yarn lint && yarn build && yarn test"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^23.0.2",
@@ -43,8 +47,8 @@
     "typescript": "*"
   },
   "dependencies": {
-    "@cmdcode/bytes-utils": "^1.0.4",
-    "@cmdcode/crypto-utils": "^1.0.8",
+    "@cmdcode/bytes-utils": "^1.0.8",
+    "@cmdcode/crypto-utils": "^1.0.15",
     "tiny-secp256k1": "^2.2.1"
   }
 }

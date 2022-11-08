@@ -1,26 +1,25 @@
 // import { Buff } from '@cmdcode/bytes-utils'
-import { Utils as CryptoUtils } from '@cmdcode/crypto-utils'
+const HIGHEST_BIT = 0x80000000
+const UINT31_MAX  = Math.pow(2, 31) - 1
 
-export default class Utils {
-  public static HIGHEST_BIT = 0x80000000
-  public static UINT31_MAX  = Math.pow(2, 31) - 1
+const checkPath = (path : string) : boolean => { 
+  return path.match(/^(m\/)?(\d+['#]?\/)*\d+'?$/) !== null
+}
 
-  public static checkPath(path : string) : boolean { 
-    return path.match(/^(m\/)?(\d+['#]?\/)*\d+'?$/) !== null
-  }
+const checkUint31 = (num : number) : boolean => {
+  return num <= UINT31_MAX
+}
 
-  public static checkUint31(num : number) : boolean {
-    return num <= Utils.UINT31_MAX
-  }
+const toXOnly = (pubKey : Uint8Array) : Uint8Array => {
+  return pubKey.length === 32 ? pubKey : pubKey.slice(1, 33)
+}
 
-  public static toXOnly(pubKey : Uint8Array) : Uint8Array {
-    return pubKey.length === 32 ? pubKey : pubKey.slice(1, 33)
-  }
-
-  // public static bytesToPath = bytesToPath
-
-  public static checksum = CryptoUtils.checksum
-
+export {
+  HIGHEST_BIT,
+  UINT31_MAX,
+  checkPath,
+  checkUint31,
+  toXOnly
 }
 
 // function bytesToPath(data : Uint8Array, prefix? : Uint8Array) {

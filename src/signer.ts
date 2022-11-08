@@ -2,31 +2,30 @@ import * as ecc  from 'tiny-secp256k1'
 
 export default class KeySign {
 
-  private __privateKey : Uint8Array | null
-  private __publicKey  : Uint8Array | null
-  private lowR : boolean
+  private readonly lowR : boolean
+  private readonly __privateKey : Uint8Array | null
+  private readonly __publicKey  : Uint8Array
 
   constructor(
     prvKey  : Uint8Array | null,
     pubKey  : Uint8Array | null,
     lowR = false
   ) {
+
+    if (pubKey === null) {
+      pubKey = getPubkey(prvKey)
+    }
+
     this.__privateKey = prvKey
     this.__publicKey  = pubKey
     this.lowR = lowR
   }
 
-  get publicKey() {
-    if (this.__privateKey && !this.__publicKey) {
-      this.__publicKey = ecc.pointFromScalar(this.__privateKey, true)
-    }
-    if (!this.__publicKey) {
-      throw TypeError('Public key is invalid!')
-    }
+  get publicKey() : Uint8Array {
     return this.__publicKey
   }
 
-  get privateKey() {
+  get privateKey() : Uint8Array | null {
     return this.__privateKey
   }
 
@@ -34,7 +33,7 @@ export default class KeySign {
     hash  : Uint8Array,
     lowR? : boolean
   ) : Uint8Array {
-    if (!this.privateKey) {
+    if (this.privateKey === null) {
       throw new Error('Missing private key')
     }
 
@@ -43,7 +42,7 @@ export default class KeySign {
     }
 
 
-    if (lowR === false) {
+    if (!lowR) {
       return ecc.sign(hash, this.privateKey)
     }
 
@@ -66,35 +65,55 @@ export default class KeySign {
   signSchnorr(
     hash : Uint8Array
   ) : Uint8Array {
-    if (!this.privateKey) {
+    if (this.privateKey === null) {
       throw new Error('Missing private key')
     }
-    if (!ecc.signSchnorr) {
+    if (typeof ecc.signSchnorr !== 'function') {
       throw new Error('signSchnorr not supported by ecc library')
     }
     return ecc.signSchnorr(hash, this.privateKey)
   }
 
   verifyECDSA(
-    hash : Uint8Array, 
+    hash : Uint8Array,
     sig  : Uint8Array
   ) : boolean {
-      if (!this.publicKey) {
+      if (this.publicKey === null) {
         return false
       }
     return ecc.verify(hash, this.publicKey, sig)
   }
 
   verifySchnorr(
-    hash : Uint8Array, 
+    hash : Uint8Array,
     sig  : Uint8Array
   ) : boolean {
-    if (!ecc.verifySchnorr) {
+    if (typeof ecc.verifySchnorr !== 'function') {
       throw new Error('verifySchnorr not supported by ecc library')
     }
-    if (!this.publicKey) {
+    if (this.publicKey === null) {
       return false
     }
     return ecc.verifySchnorr(hash, this.publicKey.slice(1, 33), sig)
   }
+}
+
+
+function getPubkey(
+  prvKey : Uint8Array | null
+) : Uint8Array {
+  if (prvKey === null) {
+    // If private key is null, throw error.
+    throw TypeError('Missing private key!')
+  }
+
+  // Derive public key from private key.
+  const pubKey = ecc.pointFromScalar(prvKey, true)
+  
+  if (pubKey === null) {
+    // If returned pubkey is null, throw error.
+    throw TypeError('Invalid public key!')
+  }
+  // Return pubkey.
+  return pubKey
 }

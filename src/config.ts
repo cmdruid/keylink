@@ -23,7 +23,7 @@ const KeyConfigs : KeyConfig[] = [
 
 export function getConfig(configName : string) : KeyConfig {
   const result = Object.values(KeyConfigs).find(({ name }) => name === configName)
-  if (!result) {
+  if (result === undefined) {
     throw TypeError('Key configuration does not exist for type: ' + configName)
   }
   return result

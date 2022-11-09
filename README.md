@@ -1,15 +1,15 @@
 # Keylink
 
-Navigate through key-tweaks like you would the world wide web!
+Derive keys from virtually anything. Navigate through derivation paths like the web!
 
-Expands the BIP32 wallet spec to support extra key-tweaking features.
+Expands the BIP32 wallet format to include many additional index types and features.
 
 Features include:
  * Specify UTF8 strings as a derivation path!
  * Specify hex-encoded strings as a derivation path!
- * Indexes can be as long as you like!
- * Hardening support for all path lengths and types!
- * Use key-based hardening (/key:index) as well as classic hardening (/0').
+ * Path indexes can be as long as you like!
+ * Hardening support for all path types!
+ * Use HMAC key-based hardening (key:index) and classic hardening (index').
  * More to come!
 
 ## How to Install

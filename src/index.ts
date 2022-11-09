@@ -1,414 +1,427 @@
 import { Buff, Stream } from '@cmdcode/bytes-utils'
-import { Hash }   from '@cmdcode/crypto-utils'
-import * as ecc   from 'tiny-secp256k1'
-import * as Utils from './utils.js'
-import KeySign    from './signer.js'
-import { KeyConfig, getConfig } from './config.js'
+import * as ecc from 'tiny-secp256k1'
+
+import * as Check  from './check.js'
+import * as Config from './config.js'
+import * as Crypto from './crypto.js'
+import KeySign     from './signer.js'
+import * as Utils  from './utils.js'
+
+type LinkMeta = [
+  type?    : string,
+  index?   : Uint8Array,
+  depth?   : number,
+  refcode? : number,
+  label?   : string
+]
 
 const ec = new TextEncoder()
 
-const DEFAULT_TYPE = 'bitcoin'
+export default class KeyLink extends KeySign {
 
-export default class KeyRing extends KeySign {
+  public readonly config     : Config.LinkConfig
+  private readonly __chain   : Uint8Array
+  private readonly __index   : Uint8Array
+  private readonly __depth   : number
+  private readonly __refcode : number
+  private readonly __label   : string | undefined
 
-  private readonly __chain  : Uint8Array
-  private readonly __index  : Uint8Array
-  private readonly __depth  : number
-  private readonly __fprint : number
-  private readonly config   : KeyConfig
+  static DEFAULT_TYPE = 'bitcoin'
 
   constructor(
-    prvKey  : Uint8Array | null,
-    pubKey  : Uint8Array | null,
-    chain   : Uint8Array,
-    keytype : string,
-    index  = new Uint8Array([0x00]),
-    depth  = 0,
-    fprint = 0x00000000
+    prvKey  : Uint8Array | null, 
+    pubKey  : Uint8Array | null, 
+    chain   : Uint8Array, 
+    ...meta : LinkMeta
   ) {
     super(prvKey, pubKey)
-    this.__chain  = chain
-    this.__index  = index
-    this.__depth  = depth
-    this.__fprint = fprint
-    this.config = getConfig(keytype)
+    this.config = Config.getConfig(meta[0] ?? KeyLink.DEFAULT_TYPE)
+
+    const { defaults: Default } = this.config
+
+    this.__chain   = chain
+    this.__index   = meta[1] ?? Buff.num(Default.index, 4)
+    this.__depth   = meta[2] ?? Default.depth
+    this.__refcode = meta[3] ?? Default.refcode
+    this.__label   = meta[4]
   }
 
   get chaincode() : Uint8Array {
+    // Return current chaincode in raw format.
     return this.__chain
   }
 
-  get depth() : number {
-    return this.__depth
-  }
-
-  get index() : Uint8Array {
+  get rawindex() : Uint8Array {
+    // Return current index in raw format.
     return this.__index
   }
 
-  get fprint() : number {
-    return this.__fprint
+  get index() : number | string {
+    // Return an integer or string format
+    // of the current index.
+    return Utils.decodeIndex(this.rawindex)
+  }
+
+  get depth() : number {
+    // Return current path depth in raw format.
+    return this.__depth
+  }
+
+  get refcode() : number {
+    // Return the parent refcode in raw format.
+    return this.__refcode
+  }
+
+  get label() : string | undefined {
+    // Return the current label (if any).
+    return this.__label
   }
 
   get isPrivate() : boolean {
     return this.privateKey !== null
   }
 
-  async identifier() : Promise<Uint8Array> {
-    return Hash.hash160(this.publicKey)
+  async getPubkeyHash() : Promise<Uint8Array> {
+    // BIP32 definition of key identifier.
+    return Crypto.hash160(this.publicKey)
   }
 
-  async fingerprint() : Promise<number> {
-    const fprint = await this.identifier()
-    return Buff.buff(fprint.slice(0, 4)).toNum()
+  async getAddress() : Promise<string> {
+    // bech32 format of the public key hash.
+    const { prefix: Prefix } = this.config
+    const pkh = await this.getPubkeyHash()
+    return Buff.buff(pkh).toBech32(Prefix.address, 0)
   }
 
-  copy(neutered : boolean = false) : KeyRing {
-    return new KeyRing(
-      neutered 
-        ? null 
-        : this.privateKey, 
-      this.publicKey, 
-      this.chaincode, 
-      this.config.name, 
-      this.index, 
-      this.depth, 
-      this.fprint
-    )
+  async getRef() : Promise<number> {
+    // BIP32 definition of parent fingerprint.
+    const kid = await this.getPubkeyHash(),
+          ref = kid.slice(0, 4)
+    return Buff.buff(ref.reverse()).toNum()
   }
 
-  neutered() : KeyRing {
+  exportMeta() : LinkMeta {
+    // Return a duplicate copy of 
+    // the current KeyLink object.
+    return [
+      this.config.name,
+      this.rawindex,
+      this.depth,
+      this.refcode,
+      this.label
+    ]
+  }
+
+  copy(isPublic = false) : KeyLink {
+    // Return a copy of the current KeyLink object.
+    return (!isPublic && this.privateKey !== null)
+      ? KeyLink.fromPrivateLink(this.privateKey, this.chaincode, ...this.exportMeta())
+      : KeyLink.fromPublicLink(this.publicKey, this.chaincode, ...this.exportMeta())
+  }
+
+  toPrivateLink() : KeyLink {
+    // Return a private (signing) copy 
+    // of the current KeyLink object.
+    return this.copy()
+  }
+
+  toPublicLink() : KeyLink {
+    // Return a public (non-signing) copy 
+    // of the current KeyLink object.
     return this.copy(true)
   }
 
   async toBase58() : Promise<string> {
+    /* Export the current KeyLink object into a 
+     * BIP32 (extended) format Base58 string.
+     */
+    const { prefix: Prefix } = this.config
     const version = (this.isPrivate)
-      ? this.config.version.private
-      : this.config.version.public
-    const buffer = Buff.buff(new ArrayBuffer(78))
-    // 4 bytes = version
+      // Select private key first, fall-back to 
+      // public key if private key is null.
+      ? Prefix.private
+      : Prefix.public
+
+    // Initiate a buffer for writing the prefix data.
+    let buffer = Buff.buff(new ArrayBuffer(9))
+    // Write the version number in BE.                   [4 bytes]
     buffer.write(Buff.num(version, 4).reverse(), 0)
-    // 1 byte = depth: 0x00 for master nodes, 0x01 for level-1 descendants, ....
+    // Write the current path depth (0-255).             [1 bytes]
     buffer.write(Buff.num(this.depth, 1), 4)
-    // 4 bytes = parentFp: fingerprint of the parent's key (0x00000000 if master key)
-    buffer.write(Buff.num(this.fprint, 4), 5)
-    // 4 bytes = index: child index number (i) in xi = xpar/i, with xi the key being serialized.
-    // This is encoded in big endian. (0x00000000 if master key)
-    buffer.write(this.index, 9)
-    // 32 bytes = chainCode: the chain code
-    buffer.write(this.chaincode, 13)
-    // 33 bytes: the public key or private key data
-    if (this.privateKey !== null) {
-      // 0x00 + k for private keys
-      buffer.write(Buff.num(0), 45)
-      buffer.write(this.privateKey, 46)
-    }
-    else {
-      // 33 bytes: the public key
-      // X9.62 encoding for public keys
-      buffer.write(this.publicKey, 45)
-    }
-    const checksum = (await Hash.hash256(buffer)).slice(0, 4)
+    // Write the refcode of the parent key in BE.        [4 bytes]
+    buffer.write(Buff.num(this.refcode, 4).reverse(), 5)
+    // Append the index array to the buffer.             [4 or varint bytes]
+    buffer = buffer.append(this.rawindex)
+    // Append the chaincode array to the buffer.         [32 bytes]
+    buffer = buffer.append(this.chaincode)
+    // Append the selected key array to the buffer.      [33 bytes]
+    buffer = (this.privateKey !== null)
+      ? buffer.append(Uint8Array.of(0x00, ...this.privateKey))
+      : buffer.append(this.publicKey)
+    // Append a hash256 checksum to the buffer.          [4 bytes]
+    const checksum = (await Crypto.hash256(buffer)).slice(0, 4)
+    // Return the buffer as a base58 encoded string.
     return buffer.append(checksum).toBase58()
   }
 
   async toWIF() : Promise<string> {
-    if (this.privateKey === null) {
-      throw new TypeError('Missing private key')
-    }
+    /* Export the current private key 
+     * as a WIF encoded Base58 string.
+     */
+    const { prefix: Prefix } = this.config
+    // Enforce that private key exists for export.
+    const privateKey = Check.catchEmptyBuffer(this.privateKey)
+    // Initiate a buffer for writing the data.
     const buffer = Buff.buff(new ArrayBuffer(34))
-    // Write WIF version byte: 1 byte.
-    buffer.write(Buff.num(this.config.wif), 0)
-    // Write private key: 32 bytes.
-    buffer.write(this.privateKey, 1)
-    // Write compression flag: 1 byte.
+    // Write the WIF version number.              [1 byte]
+    buffer.write(Buff.num(Prefix.export), 0)
+    // Write the current private key.             [32 bytes]
+    buffer.write(privateKey, 1)
+    // Write the compression flag.                [1 byte]
     buffer.write(Buff.num(0x01), 33)
-    // Write hash256 checksum: 4 bytes.
-    const checksum = (await Hash.hash256(buffer)).slice(0, 4)
+   // Append a hash256 checksum to the buffer.    [4 bytes]
+    const checksum = (await Crypto.hash256(buffer)).slice(0, 4)
+    // Return the buffer as a base58 encoded string.
     return buffer.append(checksum).toBase58()
   }
 
   async derive(
-    buffer : Uint8Array, 
-    isPrivate = false
-  ) : Promise<KeyRing> {
-    const data = Buff.buff(new ArrayBuffer(33 + buffer.length))
-
-    // TODO: Add better checks for proper 
-    // formatting of private/public keys.
-
-    if (isPrivate) {
-      if (this.privateKey === null) {
-        throw TypeError('Missing private key for hardened child key')
-      }
-      if (buffer[0] < 0x80) {
-        buffer.set([ buffer[0] + 0x80 ])
-      }
-      data.write(new Uint8Array([0x00]), 0)
-      data.write(this.privateKey, 1)
-      data.write(buffer, 33)
-    }
-    else {
-      if (buffer[0] >= 0x80) {
-        buffer.set([ buffer[0] - 0x80 ])
-      }
-      // Normal child
-      data.write(this.publicKey, 0)
-      data.write(buffer, 33)
-    }
-
-    const I = await Hash.hmac512(this.chaincode, data)
-    const IL = I.slice(0, 32)
-    const IR = I.slice(32)
-
-    // If IL value >= N, then use the next index value.
-    if (!ecc.isPrivate(IL)) {
-      return this.derive(incrementBuffer(buffer))
-    }
-
-    const fprint = await this.fingerprint()
-
-    // Private parent key -> private child key
+    pathData : Uint8Array, 
+    isHardened = false,
+    label?   : string
+  ) : Promise<KeyLink> {
+    /* Calculate a new key and chain code from the 
+     * current KeyLink, using the encoded path data,
+     */
+    // Enforce that private key exists for hardened paths.
+    Check.privateKeyRequired(isHardened, this.isPrivate)
+    // Get the label of the current key configuration.
+    const { name } = this.config
+    // Calculate a refcode from the current KeyLink.
+    const refcode = await this.getRef()
+    // Select a key to load into the buffer.
+    const buffer = (isHardened && this.privateKey !== null)
+      ? Uint8Array.of(0x00, ...this.privateKey, ...pathData)
+      : Uint8Array.of(...this.publicKey, ...pathData)
+    // Apply the buffer and derive a new tweak and chaincode.
+    const [ IL, IR ] = await Utils.tweakChain(this.chaincode, buffer)
+    // Check if private key exists.
     if (this.privateKey !== null) {
-        // ki = parse256(IL) + kpar (mod n)
-        const ki = ecc.privateAdd(this.privateKey, IL)
-        // If ki == 0, then use the next index value.
-        if (ki == null) {
-          return this.derive(incrementBuffer(buffer))
-        }
-        return KeyRing.fromPrivateKeyLocal(ki, IR, this.config.name, buffer, this.depth + 1, fprint)
-        // Public parent key -> public child key
+      // If private key exists, perform a scalar addition
+      // operation to derive the child private key.
+      const ki = ecc.privateAdd(this.privateKey, IL)
+      if (ki === null) {
+        // If derived key is null, then increment the 
+        // buffer by one bit and try again.
+        return this.derive(Utils.incrementBuffer(buffer))
+      }
+      // Return a new KeyLink object with the derived private key.
+      return KeyLink.fromPrivateLink(ki, IR, name, pathData, this.depth + 1, refcode, label)
     }
     else {
-        // Ki = point(parse256(IL)) + Kpar
-        //    = G*IL + Kpar
-        const Ki = ecc.pointAddScalar(this.publicKey, IL, true)
-        // In case Ki is the point at infinity, proceed with the next value for i
-        if (Ki === null) {
-          return this.derive(incrementBuffer(buffer))
-        }
-        return KeyRing.fromPublicKeyLocal(Ki, IR, this.config.name, buffer, this.depth + 1, fprint)
-    }
-  }
-
-  async deriveIndex(index : number) : Promise<KeyRing> {
-    return this.derive(Buff.num(index).reverse(), false)
-  }
-
-  async deriveHardIndex(index : number) : Promise<KeyRing> {
-    // typeforce(Uint31, index)
-    // Only derives hardened private keys by default
-    return this.derive(Buff.num(index + Utils.HIGHEST_BIT).reverse(), true)
-  }
-
-  async deriveHash(index : Uint8Array) : Promise<KeyRing> {
-    return this.derive(index, false)
-  }
-
-  async deriveHardHash(index : Uint8Array) : Promise<KeyRing> {
-    return this.derive(index, true)
-  }
-
-  async derivePath(path : string) : Promise<KeyRing> {
-    // typeforce(BIP32Path, path)
-    let splitPath = path.split('/')
-    if (splitPath[0] === 'm') {
-      if (this.fprint !== 0x00000000) {
-        throw new TypeError('Expected master, got child')
+      // Else public key exists, perform a point addition
+      // operation to derive the child public key.
+      const Ki = ecc.pointAddScalar(this.publicKey, IL, true)
+      if (Ki === null) {
+        // If derived point is null (infinity), increment 
+        // the buffer by one bit and try again.
+        return this.derive(Utils.incrementBuffer(buffer))
       }
+      // Return a new KeyLink object with the derived public key.
+      return KeyLink.fromPublicLink(Ki, IR, name, pathData, this.depth + 1, refcode, label)
+  }
+}
+
+  async getSoftIndex(index : number) : Promise<KeyLink> {
+    /* Derive a path index using an standard number value. */
+    const bytes = Buff.num(index, 4)
+    // Add a check for low byte.
+    return this.derive(bytes.reverse(), false)
+  }
+
+  async getHardIndex(index : number) : Promise<KeyLink> {
+    /* Derive a path index using a hardened number value. */
+    const { index: indexConfig } = this.config
+    const hardIndex = index + indexConfig.signMask,
+          bytes = Buff.num(hardIndex, 4)
+    return this.derive(bytes.reverse(), true)
+  }
+
+  async getSoftMap(
+    data : Uint8Array, type = 0) : Promise<KeyLink> {
+    /* Derive a path index using a standard byte-array value. */
+    const { map: Config } = this.config
+    const map = Uint8Array.of(Config.softPrefix, type, ...data)
+    return this.derive(map, false)
+  }
+
+  async getHardMap(data : Uint8Array, type = 0) : Promise<KeyLink> {
+    /* Derive a path index using a hardened byte-array value. */
+    const { map: Config } = this.config
+    const map = Uint8Array.of(Config.hardPrefix, type, ...data)
+    return this.derive(map, true)
+  }
+
+  async getKeyIndex(key : string, index : number) : Promise<KeyLink> {
+    /* Derive a path index using a key-tweaked number value. */
+    const bytes = Buff.num(index, 4)
+    const hash  = await Crypto.hmac256(ec.encode(key), bytes.reverse())
+    return this.derive(hash, true)
+  }
+
+  async getKeyMap(key : string, data : Uint8Array, type = 0) : Promise<KeyLink> {
+    /* Derive a path index using a key-tweaked byte-array. */
+    const { map: Config } = this.config
+    const hash = await Crypto.hmac256(ec.encode(key), data)
+    const map  = Uint8Array.of(Config.softPrefix, type, ...hash)
+    return this.derive(map, true)
+  }
+
+  async getPath(fullpath : string) : Promise<KeyLink> {
+    /* Split a given path string into an array of indices,
+     * then parse and derive each child KeyLink in the array.
+     */
+    const { defaults: Default } = this.config
+    // Check if the fullpath is a valid path.
+    Check.isValidPath(fullpath)
+    // Split the fullpath into an array of substrings.
+    let splitPath = fullpath.split('/')
+    // Check if path is deriving from the master key.
+    if (splitPath[0] === 'm') {
+      // Check the refcode of the master key.
+      Check.isDefaultRefcode(this.refcode, Default.refcode)
+      // Remove the marker from the array.
       splitPath = splitPath.slice(1)
     }
-
-    let self : KeyRing = this.copy()
-
-    for (const path of splitPath) {
+    // Declare path and copy of the current KeyLink.
+    let path : string, self : KeyLink = this.copy()
+    // Iterate over each index in the path array.
+    for (path of splitPath) {
+      let isHardened : boolean = false,
+          isHexCode  : boolean = false,
+          useHmacKey : string | undefined
+      // Check if the path is marked as hexcode.
       if (path.slice(-1) === `#`) {
-        // Parse a hashed path. 
-        if (path.slice(-2) === `'`) {
-          const buffer = Buff.hex(path.slice(0, -2))
-          self = await self.deriveHardHash(buffer)
-        } else {
-          const buffer = Buff.hex(path.slice(0, -1))
-          self = await self.deriveHash(buffer)
-        }
+        isHexCode = true
+        path = path.slice(0, -1)
       }
-      else if (path.slice(-1) === `'`) {
-        // Parse a hardened path.
-        const index = parseInt(path.slice(0, -1), 10)
-        self = await self.deriveHardIndex(index)
+      // Check if the path is marked as hardened.
+      if (path.slice(-1) === `'`) {
+        isHardened = true
+        path = path.slice(0, -1)
       }
-      else {
-        // Parse a non-hardened path.
-        const index = parseInt(path, 10)
-        self = await self.deriveIndex(index)
+      // Check if path uses a key for hardening.
+      if (path.includes(':')) {
+        const [ k, v ] = path.split(':')
+        isHardened = true
+        useHmacKey = k
+        path       = v
+      }
+      // Check if the path index is a number.
+      if (Check.isValidIndex(path) && !isHexCode) {
+        // Handle the index as an integer value.
+        const data = parseInt(path, 10)
+        self = (isHardened)
+          ? (useHmacKey === 'string')
+            ? await self.getKeyIndex(useHmacKey, data)
+            : await self.getHardIndex(data)
+          : await self.getSoftIndex(data)
+      } else {
+        // Handle the index as an encoded byte-array.
+        const type = (isHexCode) ? 0x01 : 0x00
+        const data = (isHexCode && Check.isValidHex(path))
+          ? Buff.hex(path)
+          : ec.encode(path)
+        self = (isHardened)
+          ? (useHmacKey === 'string')
+            ? await self.getKeyMap(useHmacKey, data, type)
+            : await self.getHardMap(data, type)
+          : await self.getSoftMap(data, type)
       }
     }
+    // Return the fully-derived KeyLink object.
     return self
-  }
-
-  tweak(t : Uint8Array) : KeyRing {
-    if (this.privateKey !== null)
-      return this.tweakFromPrivateKey(t)
-    return this.tweakFromPublicKey(t)
-  }
-
-  tweakFromPublicKey(t : Uint8Array) : KeyRing {
-    const xOnlyPubKey = Utils.toXOnly(this.publicKey)
-    const tweakedPublicKey = ecc.xOnlyPointAddTweak(xOnlyPubKey, t)
-    if (tweakedPublicKey === null || tweakedPublicKey.xOnlyPubkey === null) {
-      // The tweak value produces an invalid result (point at infinity).
-      throw new Error('Cannot tweak public key!')
-    }
-    const parityByte = tweakedPublicKey.parity === 0 
-      ? 0x02
-      : 0x03
-    const tweakedPublicKeyCompresed = Uint8Array.of(
-      parityByte, 
-      ...tweakedPublicKey.xOnlyPubkey
-    )
-    return new KeyRing(null, tweakedPublicKeyCompresed, this.chaincode, this.config.name, this.index, this.depth, this.fprint)
-  }
-
-  tweakFromPrivateKey(t : Uint8Array) : KeyRing {
-    if (this.privateKey === null) {
-      throw TypeError('Private key is undefined!')
-    }
-    const hasOddY = this.publicKey[0] === 3 || (this.publicKey[0] === 4 && (this.publicKey[64] & 1) === 1)
-    const privateKey = (hasOddY)
-      ? ecc.privateNegate(this.privateKey)
-      : this.privateKey
-    const tweakedPrivateKey = ecc.privateAdd(privateKey, t)
-    if (tweakedPrivateKey === null) {
-      throw new Error('Invalid tweaked private key!')
-    }
-    return new KeyRing(tweakedPrivateKey, null, this.chaincode, this.config.name, this.index, this.depth, this.fprint)
   }
 
   static fromBase58(
     b58string : string,
-    keytype = DEFAULT_TYPE
-  ) : KeyRing {
+    chainType = KeyLink.DEFAULT_TYPE
+  ) : KeyLink {
+    /* Import a Base58 formatted string as a
+     * BIP32 (extended) KeyLink object.
+     */
+    const config = Config.getConfig(chainType)
+    // Decode the string data into a readable stream.
     const buffer = new Stream(Buff.base58(b58string))
-
-    if (buffer.size !== 78) {
-      // Base58 imports must be 78 bytes long.
-      throw new TypeError('Invalid buffer length')
-    }
-
     // Fetch configuration for imported key.
-    const config = getConfig(keytype)
-
     // Parse version number: 4 bytes.
     const version = buffer.read(4).toNum()
-
-    if (version !== config.version.private && version !== config.version.public) {
-      throw new TypeError('Invalid version number for key type: ' + keytype)
-    }
-
+    // Check if version number matches key configuration.
+    Check.importKeyVersion(version, config.prefix)
     // Parse depth: 1 byte [0x00] for master nodes, [0x01+] for descendants.
     const depth = buffer.read(1).toNum()
-
-    // Parse parent key fingerprint: 4 bytes (0x00000000 if master key).
-    // Only used for quicker indexing.
-    const fprint = buffer.read(4).toNum()
-
-    if (depth === 0 && fprint !== 0x00000000) {
-      throw new TypeError('Invalid parent fingerprint for depth: 0')
+    // Parse parent key refcode: 4 bytes (0x00000000 if master key).
+    const refcode = buffer.read(4).toNum()
+    // Check if importing master key.
+    if (depth === 0) {
+      // Check the refcode of the master key.
+      Check.isDefaultRefcode(refcode, config.defaults.refcode)
     }
-
     // Parse child index: 4 bytes (0x00000000 if master key).
-    // This is the number i in xi = xpar/i, with xi the key being serialized.
+    // let index
+    // if (buffer.peek(1).toNum() === 0xFF) {
+    //   buffer.read(1)
+    //   const len = buffer.varint()
+    //   const idx = buffer.read(len)
+    //   index = Buff.of(...Buff.num(len), ...idx)
+    // } else {
     const index = buffer.read(4)
+    // }
 
-    if (depth === 0 && index.toNum() !== 0) {
-      throw new TypeError('Invalid index for depth: 0')
-    }
+    Check.noIndexAtDepthZero(depth, index.toNum())
 
     // Parse chain code: 32 bytes.
     const chaincode = buffer.read(32)
+    const parsedKey = buffer.read(33)
 
     // Parse key data: 33 bytes.
-    if (version === config.version.private) {
-      if (buffer.peek(1).toNum() !== 0x00) {
-        throw new TypeError('Private key must start with: 0x00')
-      }
-      const key = buffer.read(33)
-      return KeyRing.fromPrivateKeyLocal(key, chaincode, keytype, index, depth, fprint)
-      // 33 bytes: public key data (0x02 + X or 0x03 + X)
+    if (version === config.prefix.private) {
+      Check.privateKeyPrefixIsValid(parsedKey[0])
+      return KeyLink.fromPrivateLink(parsedKey, chaincode, chainType, index, depth, refcode)
     }
     else {
-      if (![0x02, 0x03].includes(buffer.peek(1).toNum())) {
-        throw new TypeError('Public key must start with: 0x02 || 0x03')
-      }
-      const key = buffer.read(33)
-      return KeyRing.fromPublicKeyLocal(key, chaincode, keytype, index, depth, fprint)
+      Check.publicKeyPrefixIsValid(parsedKey[0])
+      return KeyLink.fromPublicLink(parsedKey, chaincode, chainType, index, depth, refcode)
     }
   }
 
-  static fromPrivateKey(
+  static fromPrivateLink(
     privateKey : Uint8Array,
     chaincode  : Uint8Array,
-    keytype    : string
-  ) : KeyRing {
-    return KeyRing.fromPrivateKeyLocal(privateKey, chaincode, keytype)
+    ...args    : LinkMeta
+  ) : KeyLink {
+    Check.privateKeyinRange(privateKey)
+    return new KeyLink(privateKey, null, chaincode, ...args)
   }
 
-  static fromPrivateKeyLocal(
-    privateKey : Uint8Array,
-    chaincode  : Uint8Array,
-    keytype    : string,
-    index?     : Uint8Array,
-    depth?     : number,
-    fprint?    : number
-  ) : KeyRing {
-    if (!ecc.isPrivate(privateKey)) {
-      throw new TypeError('Private key not in range [1, n)')
-    }
-    return new KeyRing(privateKey, null, chaincode, keytype, index, depth, fprint)
-  }
-
-  static fromPublicKey(
-    publicKey : Uint8Array,
-    chaincode : Uint8Array, 
-    keytype   : string
-  ) : KeyRing {
-    return KeyRing.fromPublicKeyLocal(publicKey, chaincode, keytype)
-  }
-
-  static fromPublicKeyLocal(
+  static fromPublicLink(
     publicKey : Uint8Array,
     chaincode : Uint8Array,
-    keytype   : string,
-    index?    : Uint8Array,
-    depth?    : number,
-    fprint?   : number
-  ) : KeyRing {
-    if (!ecc.isPoint(publicKey)) {
-      throw new TypeError('Point is not on the curve')
-    }
-    return new KeyRing(null, publicKey, chaincode, keytype, index, depth, fprint)
+    ...args   : LinkMeta
+  ) : KeyLink {
+    Check.publicKeyOnCurve(publicKey)
+    return new KeyLink(null, publicKey, chaincode, ...args)
   }
 
   static async fromSeed(
-    seed   : Uint8Array,
-    config = DEFAULT_TYPE
-  ) : Promise<KeyRing> {
-    if (seed.length < 16 || seed.length > 64) {
-      throw new TypeError('Seed should be at least 128 bits, and at most 512 bits.')
-    }
-    const I = await Hash.hmac512(ec.encode('Bitcoin seed'), seed)
+    seedData : Uint8Array,
+    chainType = KeyLink.DEFAULT_TYPE
+  ) : Promise<KeyLink> {
+    Check.seedLengthIsValid(seedData.length)
+    const config = Config.getConfig(chainType)
+    const I = await Crypto.hmac512(ec.encode(config.seed), seedData)
     const IL = I.slice(0, 32)
     const IR = I.slice(32)
-    return KeyRing.fromPrivateKey(IL, IR, config)
+    return KeyLink.fromPrivateLink(IL, IR, chainType)
   }
-}
-
-function incrementBuffer(buffer : Uint8Array) : Uint8Array {
-  for (let i = buffer.length - 1; i >= 0; i--) {
-    if (buffer[i] < 255) {
-      buffer.set([buffer[i] + 1], i)
-      return buffer
-    }
-  }
-  throw TypeError('Unable to increment buffer: ' + buffer.toString())
 }

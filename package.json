@@ -47,7 +47,7 @@
     "typescript": "*"
   },
   "dependencies": {
-    "@cmdcode/bytes-utils": "^1.0.8",
+    "@cmdcode/bytes-utils": "^1.0.9",
     "@cmdcode/crypto-utils": "^1.0.15",
     "tiny-secp256k1": "^2.2.1"
   }

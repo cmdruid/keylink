@@ -194,6 +194,11 @@
   resolved "https://registry.yarnpkg.com/@cmdcode/bytes-utils/-/bytes-utils-1.0.8.tgz#2537eaa7d97dd03fe9ecc6aba00cadbc32655c04"
   integrity sha512-mXr8UDvw5LJOy/eIUGoCSHIx4diOprLNyAoAPlpPBei2iHXVDCcE70WvgN5FoYaslOEY03KZ+NoE0ll4ozA5yw==
 
+"@cmdcode/bytes-utils@^1.0.9":
+  version "1.0.9"
+  resolved "https://registry.yarnpkg.com/@cmdcode/bytes-utils/-/bytes-utils-1.0.9.tgz#ab42365e26c1e37344cd6778e9e1b73b36c3b5d7"
+  integrity sha512-ugcSozN/XHYSTWWNE5WrQGxWV9Ndbjni/soMJnNbZtVO/04Xbpb6/RcDVmxNxRqQflSA5NlrAmvOg2vuKgQc+A==
+
 "@cmdcode/crypto-utils@^1.0.15":
   version "1.1.15"
   resolved "https://registry.yarnpkg.com/@cmdcode/crypto-utils/-/crypto-utils-1.1.15.tgz#48c3c2c54fa89b7b4aed7986c698a3dab8abc7e9"

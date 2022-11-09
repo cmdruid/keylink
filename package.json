@@ -1,8 +1,8 @@
 {
-  "name": "hd-wallet",
+  "name": "keylink-lib",
   "type": "module",
   "version": "1.0.0",
-  "description": "Extention of the base BIP32 wallet spec, with extra features.",
+  "description": "Extention of the base BIP32 key derivation spec, with extra features.",
   "main": "./dist/main.js",
   "unpkg": "./dist/bundle.min.js",
   "types": "./dist/types/index.d.ts",
@@ -10,7 +10,7 @@
     "import": "./dist/module.js",
     "require": "./dist/main.js"
   },
-  "repository": "https://github.com/cmdruid/hd-wallet.git",
+  "repository": "https://github.com/cmdruid/keylink.git",
   "author": "Christopher Scott",
   "license": "CC-BY-1.0",
   "scripts": {

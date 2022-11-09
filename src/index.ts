@@ -367,16 +367,8 @@ export default class KeyLink extends KeySign {
       // Check the refcode of the master key.
       Check.isDefaultRefcode(refcode, config.defaults.refcode)
     }
-    // Parse child index: 4 bytes (0x00000000 if master key).
-    // let index
-    // if (buffer.peek(1).toNum() === 0xFF) {
-    //   buffer.read(1)
-    //   const len = buffer.varint()
-    //   const idx = buffer.read(len)
-    //   index = Buff.of(...Buff.num(len), ...idx)
-    // } else {
+    
     const index = buffer.read(4)
-    // }
 
     Check.noIndexAtDepthZero(depth, index.toNum())
 

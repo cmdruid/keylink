@@ -14,9 +14,7 @@
   "rules": {
     "one-var": "off",
     "return-await": "off",
-    "@typescript-eslint/return-await": [1, "in-try-catch"],
-    "no-unused-vars": "off",
-    "@typescript-eslint/no-unused-vars": "warn"
+    "@typescript-eslint/return-await": [1, "in-try-catch"]
   },
   "ignorePatterns": ["build", "coverage", "dist", "test", "webpack.*"]
 }

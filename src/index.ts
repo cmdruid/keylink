@@ -300,22 +300,22 @@ export default class KeyLink extends KeySign {
       let isHardened : boolean = false,
           isHexCode  : boolean = false,
           useHmacKey : string | undefined
-      // Check if the path is marked as hexcode.
-      if (path.slice(-1) === `#`) {
-        isHexCode = true
-        path = path.slice(0, -1)
-      }
-      // Check if the path is marked as hardened.
-      if (path.slice(-1) === `'`) {
-        isHardened = true
-        path = path.slice(0, -1)
-      }
       // Check if path uses a key for hardening.
       if (path.includes(':')) {
         const [ k, v ] = path.split(':')
         isHardened = true
         useHmacKey = k
         path       = v
+      }
+      // Check if the path is marked as hexcode.
+      if (path.slice(0) === `#`) {
+        isHexCode = true
+        path = path.slice(1)
+      }
+      // Check if the path is marked as hardened.
+      if (path.slice(-1) === `'`) {
+        isHardened = true
+        path = path.slice(0, -1)
       }
       // Check if the path index is a number.
       if (Check.isValidIndex(path) && !isHexCode) {
@@ -367,7 +367,7 @@ export default class KeyLink extends KeySign {
       // Check the refcode of the master key.
       Check.isDefaultRefcode(refcode, config.defaults.refcode)
     }
-    
+
     const index = buffer.read(4)
 
     Check.noIndexAtDepthZero(depth, index.toNum())

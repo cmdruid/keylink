@@ -7,15 +7,15 @@ export interface LinkConfig {
     export  : number
     address : string
   }
-  index: {
+  index : {
     signMask : number
     maxIndex : number
   }
-  map: {
+  map : {
     hardPrefix : number
     softPrefix : number
   }
-  defaults: {
+  defaults : {
     index   : number
     depth   : number
     refcode : number
@@ -24,21 +24,21 @@ export interface LinkConfig {
 
 const LinkConfigs : LinkConfig[] = [
   {
-    name : 'bitcoin',
-    seed : 'Bitcoin seed',
+    name   : 'bitcoin',
+    seed   : 'Bitcoin seed',
     prefix : {
       public  : 0x0488b21e,
       private : 0x0488ade4,
       export  : 0x80,
-      address : 'bc',
+      address : 'bc'
     },
     index: {
       signMask : 0x80000000,
       maxIndex : Math.pow(2, 31) - 1
     },
     map: {
-      hardPrefix: 0x80,
-      softPrefix: 0x00
+      hardPrefix : 0x80,
+      softPrefix : 0x00
     },
     defaults: {
       index   : 0,
@@ -48,7 +48,7 @@ const LinkConfigs : LinkConfig[] = [
   }
 ]
 
-export function getConfig(configName : string) : LinkConfig {
+export function getConfig (configName : string) : LinkConfig {
   const result = Object.values(LinkConfigs).find(({ name }) => name === configName)
   if (result === undefined) {
     throw TypeError('Key configuration does not exist for type: ' + configName)

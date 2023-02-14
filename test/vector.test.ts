@@ -1,7 +1,8 @@
-import { Buff } from '@cmdcode/bytes-utils'
-import KeyLink from '../src/index.js'
+import { Buff } from '@cmdcode/buff-utils'
+import { Test } from 'tape'
+import KeyLink  from '../src/index.js'
 
-export default async function (t) {
+export default async function (t : Test) {
   for (let i = 1; i < 5; i++) {
     const vector = await import(`./vectors/vector-0${i}.json`, { assert: { type: "json" }})
 
@@ -20,5 +21,7 @@ export default async function (t) {
         })
       }
     })
+
+    
   }
 }

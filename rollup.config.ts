@@ -1,15 +1,10 @@
 // rollup.config.ts
-import json from '@rollup/plugin-json'
 import typescript  from '@rollup/plugin-typescript'
-import { terser }  from 'rollup-plugin-terser'
+import terser      from '@rollup/plugin-terser'
 import nodeResolve from '@rollup/plugin-node-resolve'
-import { wasm }    from '@rollup/plugin-wasm';
 import commonjs    from '@rollup/plugin-commonjs'
-import camelcase   from 'camelcase'
 
-import pkg from './package.json' assert { type: 'json' }
-
-const libName = camelcase(String('/' + pkg.name)).split('/').at(-1)
+const libName = 'HDWallet'
 
 const treeshake = {
 	moduleSideEffects: false,
@@ -51,7 +46,7 @@ const nodeConfig = {
       minifyInternalExports: false
     },
   ],
-  plugins: [json(), typescript(tsConfig), nodeResolve(), commonjs(), wasm()],
+  plugins: [ typescript(tsConfig), nodeResolve(), commonjs() ],
   strictDeprecations: true,
   treeshake
 }
@@ -64,7 +59,7 @@ const browserConfig = {
       file: 'dist/bundle.min.js',
       format: 'iife',
       name: libName,
-      plugins: [terser()],
+      plugins: [ terser() ],
       sourcemap: true,
       globals: {
         crypto: 'crypto',
@@ -72,38 +67,9 @@ const browserConfig = {
     },
   ],
   external: ['crypto'],
-  plugins: [json(), typescript(tsConfig), nodeResolve({ browser: true }), commonjs(), wasm()],
+  plugins: [ typescript(tsConfig), nodeResolve({ browser: true }), commonjs() ],
   strictDeprecations: true,
   treeshake
 }
 
-const testConfig = {
-  input: 'test/index.test.js',
-  onwarn,
-  output: [
-    {
-      file: 'test/browser.test.js',
-      format: 'iife',
-      name: 'test',
-      plugins: [terser()],
-      sourcemap: false,
-      inlineDynamicImports: true,
-      globals: {
-        crypto: 'crypto',
-        tape: 'tape'
-      }
-    }
-  ],
-  external: ['crypto', 'tape'],
-  plugins: [
-    json(), 
-    typescript({ ...tsConfig, sourceMap: false }), 
-    nodeResolve({ browser: true }), 
-    commonjs(),
-    wasm()
-  ],
-  strictDeprecations: true,
-  treeshake
-}
-
-export default [ nodeConfig, browserConfig, testConfig ];
+export default [ nodeConfig, browserConfig ]

@@ -1,7 +1,7 @@
 {
   "name": "keylink-lib",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Derive keys from virtually anything. Extends the BIP32 wallet format to include many key types and features.",
   "main": "./dist/main.js",
   "unpkg": "./dist/bundle.min.js",

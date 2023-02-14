@@ -1,6 +1,6 @@
 import { Buff } from '@cmdcode/bytes-utils'
 import * as ecc from 'tiny-secp256k1'
-import { LinkConfig } from './config'
+import { type LinkConfig } from './config'
 
 export function isValidPath(path : string) : boolean { 
   return path.match(/^(m\/)?((\w+:)?\w+'?#?\/)*(\w+:)?\w+'?#?$/) !== null
@@ -45,12 +45,12 @@ export function catchEmptyBuffer(
 
 export function importKeyVersion(
   version : number,
-  config  : { private : number, public : number }
+  config  : { private: number, public: number }
 ) : boolean {
   const { private: prv, public: pub } = config
-  // if (version !== prv && version !== pub) {
-  //   throw new TypeError('Key version number does not match configuration.')
-  // }
+  if (version !== prv && version !== pub) {
+    throw new TypeError('Key version number does not match configuration.')
+  }
   return true
 }
 

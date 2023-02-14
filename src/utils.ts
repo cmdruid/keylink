@@ -1,4 +1,3 @@
-import * as ecc from 'tiny-secp256k1'
 import { Buff } from '@cmdcode/bytes-utils'
 
 import * as Crypto from './crypto.js'
@@ -26,30 +25,30 @@ export function tweakPrvKey(
    * the private key.
    */
   const privateKey = (hasOddY(pubKey))
-    ? ecc.privateNegate(privKey)
+    ? Crypto.fieldNegate(privKey)
     : privKey
-  const tweakedKey = ecc.privateAdd(privateKey, tweak)
+  const tweakedKey = Crypto.fieldAdd(privateKey, tweak)
   if (tweakedKey === null) {
     throw new TypeError('Invalid tweaked private key!')
   }
   return tweakedKey
 }
 
-export function tweakPubKey(
-  pubKey  : Uint8Array,
-  tweak   : Uint8Array
-) : Uint8Array {
-  /* Perform a point addition operation on 
-   * the public key.
-   */
-  const tweakedKey = ecc.xOnlyPointAddTweak(toXOnly(pubKey), tweak)
-  if (tweakedKey === null || tweakedKey.xOnlyPubkey === null) {
-    // The tweak value produces an invalid result (point at infinity).
-    throw new TypeError('Cannot tweak public key!')
-  }
-  const parityByte = tweakedKey.parity === 0 ? 0x02 : 0x03
-  return Uint8Array.of(parityByte, ...tweakedKey.xOnlyPubkey)
-}
+// export function tweakPubKey(
+//   pubKey  : Uint8Array,
+//   tweak   : Uint8Array
+// ) : Uint8Array {
+//   /* Perform a point addition operation on 
+//    * the public key.
+//    */
+//   const tweakedKey = Crypto.xPointAddTweak(toXOnly(pubKey), tweak)
+//   if (tweakedKey === null || tweakedKey.xOnlyPubkey === null) {
+//     // The tweak value produces an invalid result (point at infinity).
+//     throw new TypeError('Cannot tweak public key!')
+//   }
+//   const parityByte = tweakedKey.parity === 0 ? 0x02 : 0x03
+//   return Uint8Array.of(parityByte, ...tweakedKey.xOnlyPubkey)
+// }
 
 export async function tweakChain(
   chain : Uint8Array, 
@@ -61,7 +60,7 @@ export async function tweakChain(
     const I  = await Crypto.hmac512(chain, data),
           IL = I.slice(0, 32),
           IR = I.slice(32)
-    if (!ecc.isPrivate(IL)) {
+    if (!Crypto.fieldIsPrivate(IL)) {
       // If left I value is >= N, then increase the 
       // buffer value by one digit, and try again.
       return tweakChain(chain, incrementBuffer(data))

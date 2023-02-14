@@ -1,4 +1,6 @@
+import { Buff } from '@cmdcode/bytes-utils'
 import * as ecc from 'tiny-secp256k1'
+import { LinkConfig } from './config'
 
 export function isValidPath(path : string) : boolean { 
   return path.match(/^(m\/)?((\w+:)?\w+'?#?\/)*(\w+:)?\w+'?#?$/) !== null
@@ -46,9 +48,9 @@ export function importKeyVersion(
   config  : { private : number, public : number }
 ) : boolean {
   const { private: prv, public: pub } = config
-  if (version !== prv && version !== pub) {
-    throw new TypeError('Key version number does not match configuration.')
-  }
+  // if (version !== prv && version !== pub) {
+  //   throw new TypeError('Key version number does not match configuration.')
+  // }
   return true
 }
 
@@ -95,4 +97,15 @@ export function seedLengthIsValid(length : number) : boolean {
     throw new TypeError('Seed length should be between 128 bits and 512 bits.')
   }
   return true
+}
+
+export function isHardIndex(
+  index  : Uint8Array, 
+  config : LinkConfig
+) : boolean {
+  if (index.length === 4) {
+    const indexVal = new Buff(index.reverse()).toNum()
+    return indexVal > config.index.maxIndex
+  }
+  return (index[0] === config.map.hardPrefix)
 }

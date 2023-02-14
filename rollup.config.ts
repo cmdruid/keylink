@@ -1,10 +1,11 @@
 // rollup.config.ts
 import json from '@rollup/plugin-json'
-import typescript from '@rollup/plugin-typescript'
-import { terser } from 'rollup-plugin-terser'
+import typescript  from '@rollup/plugin-typescript'
+import { terser }  from 'rollup-plugin-terser'
 import nodeResolve from '@rollup/plugin-node-resolve'
-import commonjs from '@rollup/plugin-commonjs'
-import camelcase from 'camelcase'
+import { wasm }    from '@rollup/plugin-wasm';
+import commonjs    from '@rollup/plugin-commonjs'
+import camelcase   from 'camelcase'
 
 import pkg from './package.json' assert { type: 'json' }
 
@@ -50,7 +51,7 @@ const nodeConfig = {
       minifyInternalExports: false
     },
   ],
-  plugins: [json(), typescript(tsConfig), nodeResolve(), commonjs()],
+  plugins: [json(), typescript(tsConfig), nodeResolve(), commonjs(), wasm()],
   strictDeprecations: true,
   treeshake
 }
@@ -70,7 +71,8 @@ const browserConfig = {
       }
     },
   ],
-  plugins: [json(), typescript(tsConfig), nodeResolve({ browser: true }), commonjs()],
+  external: ['crypto'],
+  plugins: [json(), typescript(tsConfig), nodeResolve({ browser: true }), commonjs(), wasm()],
   strictDeprecations: true,
   treeshake
 }
@@ -85,7 +87,9 @@ const testConfig = {
       name: 'test',
       plugins: [terser()],
       sourcemap: false,
+      inlineDynamicImports: true,
       globals: {
+        crypto: 'crypto',
         tape: 'tape'
       }
     }
@@ -95,7 +99,8 @@ const testConfig = {
     json(), 
     typescript({ ...tsConfig, sourceMap: false }), 
     nodeResolve({ browser: true }), 
-    commonjs()
+    commonjs(),
+    wasm()
   ],
   strictDeprecations: true,
   treeshake

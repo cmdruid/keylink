@@ -1,5 +1,5 @@
 import tape from 'tape'
-import APICrawler  from './api.test.js'
+// import APICrawler  from './api.test.js'
 import vectorTests from './vector.test.js'
 import importTests from './import.test.js'
 

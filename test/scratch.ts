@@ -1,24 +1,37 @@
-import { Buff } from '@cmdcode/bytes-utils'
-import KeyLink from '../src/index.js'
-import { webcrypto as crypto } from 'crypto'
+import { Buff }               from '@cmdcode/bytes-utils'
+import { Hash, Field, Point } from '@cmdcode/crypto-utils'
+import HDWallet               from '../src/index.js'
 
+const ec   = new TextEncoder()
+const root = HDWallet.fromBase58('tpubDCMvBvR79bHQMYnYCZJzwD8SRvYf287A5soUXot1ESGSJERdXQ8PsEB4tcAqa3B5nzNHKST9VxaEdAv6MvVNtzKWRwsfMrbdPjtRD4p3maM')
+const node = await root.getPath('1/0')
+const pub  = Buff.buff(node.publicKey.slice(1))
 
-const randHash = (size = 32) => crypto.getRandomValues(new Uint8Array(size))
-const convertToHex = (data) => Buff.buff(data).toHex()
+async function taproot_tweak_pubkey(
+  pubkey : Uint8Array,
+  tweak ?: Uint8Array
+) : Promise<[ Uint8Array, boolean ]> {
+  const t = await getTweak("TapTweak", pubkey, tweak)
+  const P = Point.fromXOnly(pubkey)
+  const Q = P.add(new Field(t).point)
+  return [ Q.rawX.slice(1), Q.hasOddY ]
+}
 
-const root = await KeyLink.fromSeed(randHash())
+async function getTag(tag : string) {
+  const raw  = ec.encode(tag)
+  return Uint8Array.of(...await Hash.sha256(raw), ...await Hash.sha256(raw))
+}
 
-console.log(root)
+async function getTweak(
+  tag    : string,
+  pubkey : Uint8Array,
+  tweak ?: Uint8Array
+) : Promise<Uint8Array> {
+  let buff = Uint8Array.of(...await getTag(tag), ...pubkey)
+  if (tweak !== undefined) buff = Uint8Array.of(...buff, ...tweak)
+  return Hash.sha256(buff)
+}
 
-const path = `m/0'/${convertToHex(randHash())}'/1/test:1000000/${convertToHex(randHash())}#/1`
+const [ tweakedPub ] = await taproot_tweak_pubkey(pub)
 
-const child = await root.getPath(path)
-
-console.log(child)
-
-/** TODO:
- * Write test vectors for extended key tweaking.
- * 
- * - test vectors for key leakage.
- * - leakage is also an implicit validation of proper tweaking? 
- */
+console.log('Tweaked Pub Hex:', Buff.buff(tweakedPub).toHex())

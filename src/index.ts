@@ -1,5 +1,4 @@
 import { Buff, Stream } from '@cmdcode/bytes-utils'
-import * as ecc from 'tiny-secp256k1'
 
 import * as Check  from './check.js'
 import * as Config from './config.js'
@@ -12,7 +11,7 @@ type LinkMeta = [
   index?   : Uint8Array,
   depth?   : number,
   refcode? : number,
-  label?   : string
+  chainKey?: string
 ]
 
 const ec = new TextEncoder()
@@ -74,11 +73,26 @@ export default class KeyLink extends KeySign {
 
   get label() : string | undefined {
     // Return the current label (if any).
-    return this.__label
+    return this.__label ?? ''
   }
 
   get isPrivate() : boolean {
     return this.privateKey !== null
+  }
+
+  get isHardened() : boolean {
+    return Check.isHardIndex(this.rawindex, this.config)
+  }
+
+  inspect() : string {
+    return JSON.stringify({
+      prvKey : this.privateKey !== null 
+        ? Buff.buff(this.privateKey).toHex() 
+        : null,
+      pubKey : Buff.buff(this.publicKey).toHex(),
+      chain  : Buff.buff(this.chaincode).toHex(),
+      meta   : `i: ${this.index} d: ${this.depth} r: ${this.refcode} l: ${this.label ?? ''}`
+    }, null, 2)
   }
 
   async getPubkeyHash() : Promise<Uint8Array> {
@@ -131,6 +145,10 @@ export default class KeyLink extends KeySign {
     return this.copy(true)
   }
 
+  toShareLink() : KeyLink {
+    return this
+  }
+
   async toBase58() : Promise<string> {
     /* Export the current KeyLink object into a 
      * BIP32 (extended) format Base58 string.
@@ -145,7 +163,7 @@ export default class KeyLink extends KeySign {
     // Initiate a buffer for writing the prefix data.
     let buffer = Buff.buff(new ArrayBuffer(9))
     // Write the version number in BE.                   [4 bytes]
-    buffer.write(Buff.num(version, 4).reverse(), 0)
+    buffer.write(Buff.num(version, 4), 0)
     // Write the current path depth (0-255).             [1 bytes]
     buffer.write(Buff.num(this.depth, 1), 4)
     // Write the refcode of the parent key in BE.        [4 bytes]
@@ -186,9 +204,8 @@ export default class KeyLink extends KeySign {
   }
 
   async derive(
-    pathData : Uint8Array, 
-    isHardened = false,
-    label?   : string
+    pathData  : Uint8Array, 
+    isHardened = false
   ) : Promise<KeyLink> {
     /* Calculate a new key and chain code from the 
      * current KeyLink, using the encoded path data,
@@ -209,26 +226,26 @@ export default class KeyLink extends KeySign {
     if (this.privateKey !== null) {
       // If private key exists, perform a scalar addition
       // operation to derive the child private key.
-      const ki = ecc.privateAdd(this.privateKey, IL)
+      const ki = Crypto.fieldAdd(this.privateKey, IL)
       if (ki === null) {
         // If derived key is null, then increment the 
         // buffer by one bit and try again.
         return this.derive(Utils.incrementBuffer(buffer))
       }
       // Return a new KeyLink object with the derived private key.
-      return KeyLink.fromPrivateLink(ki, IR, name, pathData, this.depth + 1, refcode, label)
+      return KeyLink.fromPrivateLink(ki, IR, name, pathData, this.depth + 1, refcode)
     }
     else {
       // Else public key exists, perform a point addition
       // operation to derive the child public key.
-      const Ki = ecc.pointAddScalar(this.publicKey, IL, true)
+      const Ki = Crypto.pointAddScalar(this.publicKey, IL, true)
       if (Ki === null) {
         // If derived point is null (infinity), increment 
         // the buffer by one bit and try again.
         return this.derive(Utils.incrementBuffer(buffer))
       }
       // Return a new KeyLink object with the derived public key.
-      return KeyLink.fromPublicLink(Ki, IR, name, pathData, this.depth + 1, refcode, label)
+      return KeyLink.fromPublicLink(Ki, IR, name, pathData, this.depth + 1, refcode)
   }
 }
 
@@ -236,7 +253,7 @@ export default class KeyLink extends KeySign {
     /* Derive a path index using an standard number value. */
     const bytes = Buff.num(index, 4)
     // Add a check for low byte.
-    return this.derive(bytes.reverse(), false)
+    return this.derive(bytes, false)
   }
 
   async getHardIndex(index : number) : Promise<KeyLink> {
@@ -244,7 +261,7 @@ export default class KeyLink extends KeySign {
     const { index: indexConfig } = this.config
     const hardIndex = index + indexConfig.signMask,
           bytes = Buff.num(hardIndex, 4)
-    return this.derive(bytes.reverse(), true)
+    return this.derive(bytes, true)
   }
 
   async getSoftMap(
@@ -273,7 +290,7 @@ export default class KeyLink extends KeySign {
     /* Derive a path index using a key-tweaked byte-array. */
     const { map: Config } = this.config
     const hash = await Crypto.hmac256(ec.encode(key), data)
-    const map  = Uint8Array.of(Config.softPrefix, type, ...hash)
+    const map  = Uint8Array.of(Config.hardPrefix, type, ...hash)
     return this.derive(map, true)
   }
 

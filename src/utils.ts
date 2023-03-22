@@ -1,54 +1,10 @@
-import { Buff } from '@cmdcode/buff-utils'
+import { Hash } from '@cmdcode/crypto-utils'
+import { KeyPrefix } from './types.js'
 
-import * as Crypto from './crypto.js'
-
-export function toXOnly (pubKey : Uint8Array) : Uint8Array {
-  return pubKey.length === 32 ? pubKey : pubKey.slice(1, 33)
+const KEY_TYPES = {
+  legacy  : { prv: 0x0488ade4, pub: 0x0488b21e },
+  taproot : { prv: 0x04358394, pub: 0x043587cf }
 }
-
-export function hasOddY (pubKey : Uint8Array) : boolean {
-  /* Check if pubkey is marked as odd,
-   * or has a Y coordinate that is odd.
-   */
-  return pubKey[0] === 3 || (pubKey[0] === 4 && (pubKey[64] & 1) === 1)
-}
-
-export function tweakPrvKey (
-  privKey : Uint8Array | null,
-  pubKey  : Uint8Array,
-  tweak   : Uint8Array
-) : Uint8Array {
-  if (privKey === null) {
-    throw new TypeError('Private key is null!')
-  }
-  /* Perform a scalar addition operation on
-   * the private key.
-   */
-  const privateKey = (hasOddY(pubKey))
-    ? Crypto.fieldNegate(privKey)
-    : privKey
-  const tweakedKey = Crypto.fieldAdd(privateKey, tweak)
-  if (tweakedKey === null) {
-    throw new TypeError('Invalid tweaked private key!')
-  }
-  return tweakedKey
-}
-
-// export function tweakPubKey(
-//   pubKey  : Uint8Array,
-//   tweak   : Uint8Array
-// ) : Uint8Array {
-//   /* Perform a point addition operation on
-//    * the public key.
-//    */
-//   const tweakedKey = Crypto.xPointAddTweak(toXOnly(pubKey), tweak)
-//   if (tweakedKey === null || tweakedKey.xOnlyPubkey === null) {
-//     // The tweak value produces an invalid result (point at infinity).
-//     throw new TypeError('Cannot tweak public key!')
-//   }
-//   const parityByte = tweakedKey.parity === 0 ? 0x02 : 0x03
-//   return Uint8Array.of(parityByte, ...tweakedKey.xOnlyPubkey)
-// }
 
 export async function tweakChain (
   chain : Uint8Array,
@@ -57,14 +13,9 @@ export async function tweakChain (
   /* Perform a SHA-512 operation on the provided key,
    * then an HMAC signing operation using the chain code.
    */
-    const I  = await Crypto.hmac512(chain, data),
+    const I  = await Hash.hmac512(chain, data),
           IL = I.slice(0, 32),
           IR = I.slice(32)
-    if (!Crypto.fieldIsPrivate(IL)) {
-      // If left I value is >= N, then increase the
-      // buffer value by one digit, and try again.
-      return tweakChain(chain, incrementBuffer(data))
-    }
     // Return each half of the hashed result in an array.
     return [ IL, IR ]
 }
@@ -83,13 +34,27 @@ export function incrementBuffer (buffer : Uint8Array) : Uint8Array {
   throw TypeError('Unable to increment buffer: ' + buffer.toString())
 }
 
-export function decodeIndex (raw : Uint8Array) : number | string {
-  switch (true) {
-    case (raw.length === 4):
-      return Buff.buff(raw.reverse()).toNum()
-    case (raw[1] === 1):
-      return Buff.buff(raw).toHex()
-    default:
-      return Buff.buff(raw).toStr()
+export function getKeyFormat (
+  ver : number
+) : [ string, number ] {
+  let key : keyof typeof KEY_TYPES
+  for (key in KEY_TYPES) {
+    if (KEY_TYPES[key].prv === ver) {
+      return [ key, 0 ]
+    } else if (KEY_TYPES[key].pub === ver) {
+      return [ key, 1 ]
+    }
   }
+  throw new TypeError('Invalid key version:' + String(ver))
+}
+
+export function getKeyPrefix (
+  label ?: string
+) : KeyPrefix {
+  if (label === undefined) label = 'legacy'
+
+  if (!Object.keys(KEY_TYPES).includes(label)) {
+    throw new TypeError('Invalid key type:' + label)
+  }
+  return KEY_TYPES[label as keyof typeof KEY_TYPES]
 }

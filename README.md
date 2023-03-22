@@ -6,16 +6,14 @@ Expands the BIP32 wallet format to include many additional index types and featu
 
 Features include:
  * Specify UTF8 strings as a derivation path!
- * Specify hex-encoded strings as a derivation path!
- * Path indexes can be as long as you like!
+ * Specify hex and hashes as a derivation path!
  * Hardening support for all path types!
- * Use HMAC key-based hardening (key:index) and classic hardening (index').
  * More to come!
 
 ## How to Install
 Using the browser:
 ```html
-<script src="https://unpkg.com/@cmdcode/keylink.min.js">
+<script src="https://unpkg.com/@cmdcode/keylink">
 ```
 Using nodejs:
 ```js
@@ -26,36 +24,37 @@ import KeyLink from '@cmdcode/keylink'
 ```
 
 ## How to Use
-```ts
-// List of Import formats.
-KeyLink
-  .fromSeed()        // Create from raw bytes or BIP39 seed phrase.
-  .fromBase58()      // Create from standard base58check format.
-  .fromPrivateLink() // Create a private KeyLink from arguments.
-  .fromPublicLink()  // Create a public KeyLink from arguments.
 
-// List of Export formats.
+You can import and export links in a variety of ways.
+
+```ts
+/* List of Import methods. */
 KeyLink
+  .fromSeed()       // Create a new chain from a raw seed phrase.
+  .fromBase58()     // Import a link from standard base58 format.
+  .fromPrivateKey() // Import a link from private key and chaincode.
+  .fromPublicKey()  // Import a link from public key and chaincode.
+
+/* List of Export methods. */
+KeyLink
+  .copy()            // Export a a duplicate copy of current link.
+  .export()          // Export a JSON object of the current link.
+  .toPublic()        // Export a public (non-signing) copy of current link.
   .toWIF()           // Export as Wallet Import Format for Bitcoin Core.
   .toBase58()        // Export as standard base58check format.
-  .toPrivateLink()   // Export a private (signing) copy of current link.
-  .toPublicLink()    // Export a public (non-signing) copy of current link.
 
-// Create a link by providing a chaincode and
-// the matching private key or public key.
-const link = new KeyLink(
-  privateKey  : Uint8Array | null,
-  publicKey   : Uint8Array | null,
-  chaincode   : Uint8Array,
-  // You can also provide an 
-  // optional array of metadata.
-  ...metaData : [
-    type?    : string,
-    index?   : Uint8Array,
-    depth?   : number,
-    refcode? : number,
-    label?   : string
-  ]
+/* Create a link by providing a chaincode and
+ * the matching private key or public key.
+ */
+const link = new KeyLink(  
+  seckey ?: Uint8Array  // Private Key.
+  pubkey ?: Uint8Array  // Public Key.
+  code    : Uint8Array  // Chaincode paired with the key.
+  format ?: string      // The format version of the key.
+  depth  ?: number      // The depth of this link (max 255).
+  index  ?: number      // Index value of the provided key.
+  label  ?: string      // Hash label of the provided key.
+  marker ?: number      // Checksum marker from parent key.
 )
 
 // BIP44 paths still behave like normal.
@@ -63,8 +62,8 @@ link.getPath("m/44'/0'/0'/0/1") => new KeyLink
 
 // The API has been simplified for better usage and
 // understanding of hardened / non-hardened key spaces.
-link.getHardIndex(index : number) => new KeyLink
-link.getSoftIndex(index : number) => new KeyLink
+link.getSecIndex(index : number) => new KeyLink
+link.getPubIndex(index : number) => new KeyLink
 
 // You can now specify any length character string,
 // and it will be parsed as Uint8Array bytes.
@@ -73,50 +72,34 @@ link.getPath("0'/thisisatotallyvalidpath/0/1")
 // Hardening also works on strings.
 link.getPath("0'/thispathwillbehardened'/0/1")
 
-// If you want to parse a string as hex (either
-// hardened or not), prepend a hashtag character.
-link.getPath("#aabbccddeeff00112233445566778899'/0/1")
+// If you want to parse a string as a hex-encoded
+// value, you can prepend it with a hashtag character.
+link.getPath("m/84/#aabbccddeeff00112233445566778899'/0/1")
 
 // This feature takes advantage of a new API format
-// that allows passing byte-arrays for key derivation.
-link.getHardMap(data : Uint8Array) => new KeyLink
-link.getSoftMap(data : Uint8Array) => new KeyLink
-
-// You can now use HMAC signing to harden key paths.
-// Simply prefix a colon-separated string as the HMAC key:
-link.getPath("main:0/sub:0/1")
-link.getPath("site:stacker.news/pub")
-link.getPath("contracts:#aabbccddeeff/id:0011002200330044")
-
-// This feature uses a new derviation operation
-// that applies HMAC256 as a hardening tweak.
-link.getKeyIndex(key : string, index : number)  => new KeyLink
-link.getKeyMap(key : string, data : Uint8Array) => new KeyLink
+// that allows passing strings and hex for key derivation.
+link.getSecLabel (data : string) => new KeyLink
+link.getPubLabel (data : string) => new KeyLink
+link.getSecHash  (data : string | Uint8Array) => new KeyLink
+link.getPubHash  (data : string | Uint8Array) => new KeyLink
 
 // Full Path derivation API:
 link
-  .getHardLink()
-  .getSoftLink()
-  .getHardIndex()
-  .getSoftIndex()
-  .getHardMap()
-  .getSoftMap()
-  .getKeyIndex()
-  .getKeyMap()
+  .getSecIndex()
+  .getPubIndex()
+  .getSecHash()
+  .getPubHash()
+  .getSecLabel()
+  .getPubLabel()
   .getPath()
 
 // Additional API:
 link
   .chaincode => Uint8Array  // The link chaincode.
-  .rawindex  => Uint8Array  // The current index (in bytes).
   .index     => string      // The current index (formatted).
   .depth     => number      // The current link depth.
-  .refcode   => number      // The parent refcode (fingerprint).
+  .marker    => number      // The parent marker (fingerprint).
   .label     => string      // The current key label (if any).
-  .getPubkeyHash() => string : pubkeyHash
-  .getAddress()    => string : address
-  .getRef()        => number : refcode
-  .copy()          => new KeyLink
 ```
 
 ## Testing
@@ -124,18 +107,9 @@ Don't trust, verify!
 
 All BIP32 specified test vectors should pass. Currently in the progress of adding custom vectors for the new derivation types.
 
-All cryptography is done using the `tiny-secp256k1` library, plus the WebCrypto libary. Currently I am using a helper library called `Crypto_Utils` to provide a better WebCrypto interface (and ripemd160), but you can easily import your own library by checking out the `src/crypto.ts` file.
+All cryptography is done using a fork of the `@noble-secp256k1` library, plus the standard WebCrypto API.
 
 If you have a question or run into any issues, please feel free to open a ticket on the issues page!
-
-## Roadmap
-
-Currently on the roadmap:
- 
- * Shared key / link derivation (using ECDH).
- * Discreet Log / Adaptor signature API.
-
-More features to come!
 
 ## Contributions
 All contributions are welcome!
@@ -148,7 +122,8 @@ https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
 **BIP44 Wiki Page**  
 https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki
 
-**Bytes-Utils**  
+**Buff-Utils**  
+https://github.com/cmdruid/buff-utils
 
 **Crypto-Utils**  
-
+https://github.com/cmdruid/crypto-utils

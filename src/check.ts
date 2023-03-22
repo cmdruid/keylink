@@ -1,61 +1,44 @@
-import { Buff }  from '@cmdcode/buff-utils'
-import { type LinkConfig } from './config'
+import { Buff } from '@cmdcode/buff-utils'
+import { Field, Point } from '@cmdcode/crypto-utils'
 
-import {
-  fieldIsPrivate,
-  pointIsValid
-} from './crypto.js'
-
-export function isValidPath (path : string) : boolean {
-  return path.match(/^(m\/)?((\w+:)?\w+'?#?\/)*(\w+:)?\w+'?#?$/) !== null
+export function isValidPath (path : string) : void {
+  const regex = /^(m\/)?(#?\w+'?\/)*#?\w+'?$/
+  if (path.match(regex) === null) {
+    throw new Error('Provided path string is invalid: ' + path)
+  }
 }
 
-export function isValidHex (hex : string) : boolean {
-  return hex.match(/^[0-9a-fA-F]$/) !== null
+export function isValidHash (hash : string) : void {
+  const regex = /^[0-9a-fA-F]{64}$/
+  if (hash.match(regex) === null) {
+    throw new Error('Provided hash string is invalid: ' + hash)
+  }
 }
 
-export function isValidIndex (index : string) : boolean {
-  return index.match(/^[0-9]{1,10}$/) !== null
+export function isValidIndex (index : string) : void {
+  const regex = /^[0-9]+$/
+  if (index.match(regex) === null) {
+    throw new Error('Provided index string is invalid: ' + index)
+  }
+  indexInRange(parseInt(index))
 }
 
-export function isDefaultRefcode (
-  current : number,
-  config  : number
+export function isEmptyMarker (
+  marker : number,
+  defaults = 0x00000000
 ) : boolean {
-  if (current !== config) {
-    throw new TypeError('Master key refcode must be default.')
+  if (marker !== defaults) {
+    throw new TypeError('Master key marker must be zeroed out.')
   }
   return true
 }
 
-export function privateKeyRequired (
-  required  : boolean,
-  keyExists : boolean
-  ) : boolean {
-  if (required && !keyExists) {
-    throw new TypeError('Private key is required.')
+export function indexInRange (
+  index : number
+) : void {
+  if (index > 0x80000000) {
+    throw new TypeError('Index value must not exceed 31 bits.')
   }
-  return true
-}
-
-export function catchEmptyBuffer (
-  data : Uint8Array | null | undefined
-) : Uint8Array {
-  if (data === null || data === undefined || data.every((e) => e === 0)) {
-    throw new TypeError('Data buffer cannot be empty!')
-  }
-  return data
-}
-
-export function importKeyVersion (
-  version : number,
-  config  : { private : number, public : number }
-) : boolean {
-  const { private: prv, public: pub } = config
-  if (version !== prv && version !== pub) {
-    throw new TypeError('Key version number does not match configuration.')
-  }
-  return true
 }
 
 export function noIndexAtDepthZero (
@@ -68,30 +51,16 @@ export function noIndexAtDepthZero (
   return true
 }
 
-export function privateKeyPrefixIsValid (prefix : number) : boolean {
-  if (prefix !== 0x00) {
-    throw new TypeError('Private key must start with zero byte.')
+export function privateKeyInRange (seckey : Uint8Array) : boolean {
+  const big = Buff.raw(seckey).big
+  if (big === 0n || big >= Field.N) {
+    throw new TypeError('Private key value is out of range!')
   }
   return true
 }
 
-export function publicKeyPrefixIsValid (prefix : number) : boolean {
-  if (prefix !== 0x02 && prefix !== 0x03) {
-    throw new TypeError('Public key must start with a valid byte.')
-  }
-  return true
-}
-
-export function privateKeyinRange (privKey : Uint8Array) : boolean {
-  if (!fieldIsPrivate(privKey)) {
-    console.log('failed!')
-    throw new TypeError('Private key invalid. Not within range of N!')
-  }
-  return true
-}
-
-export function publicKeyOnCurve (pubKey : Uint8Array) : boolean {
-  if (!pointIsValid(pubKey)) {
+export function publicKeyOnCurve (pubkey : Uint8Array) : boolean {
+  if (!Point.validate(pubkey)) {
     throw new TypeError('Public key invalid. Point is not on the curve!')
   }
   return true
@@ -102,15 +71,4 @@ export function seedLengthIsValid (length : number) : boolean {
     throw new TypeError('Seed length should be between 128 bits and 512 bits.')
   }
   return true
-}
-
-export function isHardIndex (
-  index  : Uint8Array,
-  config : LinkConfig
-) : boolean {
-  if (index.length === 4) {
-    const indexVal = new Buff(index.reverse()).toNum()
-    return indexVal > config.index.maxIndex
-  }
-  return (index[0] === config.map.hardPrefix)
 }

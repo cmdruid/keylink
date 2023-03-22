@@ -53,20 +53,19 @@ const nodeConfig = {
 
 const browserConfig = {
   input: 'src/index.ts',
-  onwarn,
+  // onwarn,
   output: [
     {
       file: 'dist/bundle.min.js',
       format: 'iife',
       name: libName,
+      globals : {
+        crypto: 'crypto'
+      },
       plugins: [ terser() ],
-      sourcemap: true,
-      globals: {
-        crypto: 'crypto',
-      }
+      sourcemap: true
     },
   ],
-  external: ['crypto'],
   plugins: [ typescript(tsConfig), nodeResolve({ browser: true }), commonjs() ],
   strictDeprecations: true,
   treeshake

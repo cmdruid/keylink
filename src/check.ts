@@ -2,7 +2,7 @@ import { Buff } from '@cmdcode/buff-utils'
 import { Field, Point } from '@cmdcode/crypto-utils'
 
 export function isValidPath (path : string) : void {
-  const regex = /^(m\/)?(#?\w+'?\/)*#?\w+'?$/
+  const regex = /^(m)?(\/)?(#?\w+'?\/)*#?\w+'?$/
   if (path.match(regex) === null) {
     throw new Error('Provided path string is invalid: ' + path)
   }

@@ -1,8 +1,10 @@
-import KeyLink from '../src/index.js'
+import KeyLink  from '../src/index.js'
+import { Buff } from '@cmdcode/buff-utils'
 
+const tprv = 'tprv8ZgxMBicQKsPemtEKyRCoJDmRb8XK6zJoSRyDDFztCgAkQhhKemP8HTKrJzTLYsfeGgAjUBufwLUc7JRUUsChqoVFxCMco1xbGzYDkqbrET'
 
-const tpub = 'tpubDDSv5UhCKz7Ud3yBHDxdqK6FKqbZTYZ2UxGNYy4aWWPDqVbJXNHkYgyyGn6wF8zNsn5wmm1K1YM4DMcVGzY2gKm7c7tBfGGzsiPHsNVQegd'
+const key = KeyLink.fromBase58(tprv)
 
-const key = KeyLink.fromBase58(tpub)
+const link = await key.getPath("/84'/1'/0'/0/10")
 
-console.log(key)
+console.log(link.pubkey.hex)

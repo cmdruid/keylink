@@ -1,31 +1,32 @@
-import { Field, Hash, SecretKey, Point } from '@cmdcode/crypto-utils'
+import { Field, Hash, SecretKey, Point, PublicKey } from '@cmdcode/crypto-utils'
 import { Buff, Bytes, Stream } from '@cmdcode/buff-utils'
-import { KeyPrefix, Link } from './types.js'
+import { VersionData, Link }   from './types.js'
 import * as Check from './check.js'
-import * as Utils from './utils.js'
+import { getVersionData } from './version.js'
+import { incrementBuffer, tweakChain } from './utils.js'
 
 const ec = new TextEncoder()
 
 export default class KeyLink {
   readonly _link     : Link
-  readonly prefix    : KeyPrefix
+  readonly _config   : VersionData
+  readonly _seckey  ?: Uint8Array
+  readonly _pubkey  ?: Uint8Array
+  readonly label    ?: string
   readonly depth     : number
   readonly marker    : number
   readonly index     : number
   readonly chaincode : Uint8Array
-  readonly seckey   ?: Uint8Array
-  readonly _pubkey  ?: Uint8Array
-  readonly label    ?: string
 
   constructor (link : Link) {
     this._link     = link
+    this._config   = getVersionData(link.config)
     this._pubkey   = link.pubkey
-    this.prefix    = Utils.getKeyPrefix(link.format)
+    this._seckey   = link.seckey
     this.depth     = link.depth   ?? 0
     this.marker    = link.marker  ?? 0x00000000
     this.index     = link.index   ?? 0
     this.chaincode = link.code
-    this.seckey    = link.seckey
     this.label     = link.label
 
     if (this.depth === 0) {
@@ -41,17 +42,41 @@ export default class KeyLink {
       Check.privateKeyInRange(this.seckey)
     }
 
-    Check.publicKeyOnCurve(this.pubkey)
+    Check.publicKeyOnCurve(this.pubkey.raw)
   }
 
-  get pubkey () : Uint8Array {
+  get prefix () : number {
+    return (this.isPrivate)
+      ? this._config.sec_prefix
+      : this._config.pub_prefix
+  }
+
+  get type () : string {
+    return this._config.type
+  }
+
+  get purpose () : number {
+    return this._config.purpose
+  }
+
+  get network () : number {
+    return this._config.network
+  }
+
+  get seckey () : SecretKey | undefined {
+    return (this._seckey !== undefined)
+      ? new SecretKey(this._seckey)
+      : undefined
+  }
+
+  get pubkey () : PublicKey {
     if (this.seckey === undefined) {
       if (this._pubkey === undefined) {
         throw new TypeError('No keys provided!')
       }
-      return this._pubkey
+      return new PublicKey(this._pubkey)
     }
-    return new SecretKey(this.seckey).pub.raw
+    return new SecretKey(this.seckey).pub
   }
 
   get isPrivate () : boolean {
@@ -71,7 +96,7 @@ export default class KeyLink {
 
   getMarker () : number {
     // BIP32 definition of parent fingerprint.
-    const pkh = Buff.raw(this.pubkey).toHash('hash160')
+    const pkh = Buff.raw(this.pubkey.raw).toHash('hash160')
     return Buff.raw(pkh.slice(0, 4)).num
   }
 
@@ -84,21 +109,18 @@ export default class KeyLink {
   }
 
   toPublic () : KeyLink {
-    return new KeyLink({ ...this._link, seckey: undefined, pubkey: this.pubkey })
+    return new KeyLink({ ...this._link, seckey: undefined, pubkey: this.pubkey.raw })
   }
 
   toBase58 () : string {
     /* Export the current KeyLink object into a
      * BIP32 (extended) format Base58 string.
      */
-    const prefix = (this.seckey !== undefined)
-      ? this.prefix.prv
-      : this.prefix.pub
     const key = (this.seckey !== undefined)
-      ? Uint8Array.of(0x00, ...this.seckey)
-      : this.pubkey
+      ? Buff.of(0x00, ...this.seckey)
+      : this.pubkey.raw
     const buffer = Buff.of(
-      ...Buff.num(prefix,      4),
+      ...Buff.num(this.prefix, 4),
       ...Buff.num(this.depth,  1),
       ...Buff.num(this.marker, 4),
       ...Buff.num(this.index,  4),
@@ -134,7 +156,8 @@ export default class KeyLink {
     const index  = (tweak.length > 4) ? 0xFFFFFFFF : Buff.raw(tweak).num
     const label  = (tweak.length > 4) ? Buff.raw(tweak).hex : undefined
 
-    let { seckey, pubkey } = this
+    let seckey = this.seckey?.raw,
+        pubkey = this.pubkey.raw
 
     if (isHardened && seckey === undefined) {
       throw new TypeError('No private key available for hardened path!')
@@ -146,7 +169,7 @@ export default class KeyLink {
       : Uint8Array.of(...pubkey, ...tweak)
 
     // Derive a new tweak and chaincode from the buffer.
-    const [ scalar, code ] = await Utils.tweakChain(this.chaincode, buffer)
+    const [ scalar, code ] = await tweakChain(this.chaincode, buffer)
 
     if (seckey !== undefined) {
       // If private key exists, perform a scalar addition
@@ -154,7 +177,7 @@ export default class KeyLink {
       seckey = new Field(seckey).add(scalar)
       // If new key is invalid, increment buffer and ty again.
       if (!Check.privateKeyInRange(seckey)) {
-        return this.derive(Utils.incrementBuffer(buffer), isHardened)
+        return this.derive(incrementBuffer(buffer), isHardened)
       }
     } else {
       // Else public key exists, perform a point addition
@@ -162,10 +185,10 @@ export default class KeyLink {
       pubkey = new Point(pubkey).add(scalar).rawX
       // If new key is invalid, increment buffer and ty again.
       if (!Check.publicKeyOnCurve(pubkey)) {
-        return this.derive(Utils.incrementBuffer(buffer), isHardened)
+        return this.derive(incrementBuffer(buffer), isHardened)
       }
   }
-  return new KeyLink({ seckey, pubkey, code, index, depth: this.depth + 1, marker, label })
+  return new KeyLink({ config: this._config, seckey, pubkey, code, index, depth: this.depth + 1, marker, label })
 }
 
   async getPubIndex (index : number) : Promise<KeyLink> {
@@ -268,10 +291,9 @@ export default class KeyLink {
      * BIP32 (extended) KeyLink object.
      */
     const buffer = new Stream(Buff.b58check(b58string))
-    const [ format, type ] = Utils.getKeyFormat(buffer.read(4).num)
+    const prefix = buffer.read(4).num
 
     const link : Link = {
-      format,                         // Format version number.
       depth  : buffer.read(1).num,  // Parse depth ([0x00] for master).
       marker : buffer.read(4).num,  // Parent key reference (0x00000000 for master).
       index  : buffer.read(4).num,  // Key index.
@@ -289,12 +311,14 @@ export default class KeyLink {
     }
 
     // Parse key data: 33 bytes.
-    if (key[0] === 0x00 && type === 0) {
+    if (key[0] === 0) {
+      link.config = { sec_prefix: prefix }
       link.seckey = key.raw
-    } else if ((key[0] === 0x02 || key[0] === 0x03) && type === 1) {
+    } else if (key[0] === 0x02 || key[0] === 0x03) {
+      link.config = { pub_prefix: prefix }
       link.pubkey = key.raw
     } else {
-      throw new TypeError('Invalid key format!')
+      throw new TypeError('Unrecognized key prefix: ' + String(key[0]))
     }
     return new KeyLink(link)
   }

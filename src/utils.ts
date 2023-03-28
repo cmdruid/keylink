@@ -1,10 +1,4 @@
 import { Hash } from '@cmdcode/crypto-utils'
-import { KeyPrefix } from './types.js'
-
-const KEY_TYPES = {
-  legacy  : { prv: 0x0488ade4, pub: 0x0488b21e },
-  taproot : { prv: 0x04358394, pub: 0x043587cf }
-}
 
 export async function tweakChain (
   chain : Uint8Array,
@@ -32,29 +26,4 @@ export function incrementBuffer (buffer : Uint8Array) : Uint8Array {
     }
   }
   throw TypeError('Unable to increment buffer: ' + buffer.toString())
-}
-
-export function getKeyFormat (
-  ver : number
-) : [ string, number ] {
-  let key : keyof typeof KEY_TYPES
-  for (key in KEY_TYPES) {
-    if (KEY_TYPES[key].prv === ver) {
-      return [ key, 0 ]
-    } else if (KEY_TYPES[key].pub === ver) {
-      return [ key, 1 ]
-    }
-  }
-  throw new TypeError('Invalid key version:' + String(ver))
-}
-
-export function getKeyPrefix (
-  label ?: string
-) : KeyPrefix {
-  if (label === undefined) label = 'legacy'
-
-  if (!Object.keys(KEY_TYPES).includes(label)) {
-    throw new TypeError('Invalid key type:' + label)
-  }
-  return KEY_TYPES[label as keyof typeof KEY_TYPES]
 }

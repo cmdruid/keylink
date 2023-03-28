@@ -1,12 +1,28 @@
+export interface VersionData {
+  type       : string
+  purpose    : number
+  network    : number
+  sec_prefix : number
+  pub_prefix : number
+}
+
+export interface VersionFilter {
+  type       ?: string
+  purpose    ?: number
+  network    ?: number
+  sec_prefix ?: number
+  pub_prefix ?: number
+}
+
 export interface Link {
-  format ?: string      // The format version of the key.
-  depth  ?: number      // The depth of this link (max 255).
-  marker ?: number      // Checksum marker from parent key.
-  index  ?: number      // Index value of the provided key.
-  code    : Uint8Array  // Chaincode paired with the key.
-  seckey ?: Uint8Array  // Private Key.
-  pubkey ?: Uint8Array  // Public Key.
-  label  ?: string      // Key / label metadata.
+  config ?: VersionFilter // The format version of the key.
+  depth  ?: number        // The depth of this link (max 255).
+  marker ?: number        // Checksum marker from parent key.
+  index  ?: number        // Index value of the provided key.
+  code    : Uint8Array    // Chaincode paired with the key.
+  seckey ?: Uint8Array    // Private Key.
+  pubkey ?: Uint8Array    // Public Key.
+  label  ?: string        // Key / label metadata.
 }
 
 export interface KeyPrefix {

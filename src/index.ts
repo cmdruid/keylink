@@ -218,6 +218,8 @@ export default class KeyLink {
     if (splitPath[0] === 'm') {
       // Check the refcode of the master key.
       Check.isEmptyMarker(this.marker)
+    } 
+    if (splitPath[0] === 'm' || splitPath[0] === '') {
       // Remove the marker from the array.
       splitPath = splitPath.slice(1)
     }

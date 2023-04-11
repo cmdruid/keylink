@@ -190,23 +190,15 @@
     "@babel/helper-validator-identifier" "^7.19.1"
     to-fast-properties "^2.0.0"
 
-"@cmdcode/buff-utils@^1.5.2", "@cmdcode/buff-utils@^1.5.7":
-  version "1.5.7"
-  resolved "https://registry.yarnpkg.com/@cmdcode/buff-utils/-/buff-utils-1.5.7.tgz#7eb626a81cb6726a84cc0215d3590cf3175732ee"
-  integrity sha512-qgWBzRKoVnFOnlNqwSbdVxf3fwjQd1T5YLzE//o8S/oMpKnWz2wEWTulacajldhun1JGqNkWSOKumGXDlOYkuw==
+"@cmdcode/buff-utils@^1.7.1":
+  version "1.7.1"
+  resolved "https://registry.yarnpkg.com/@cmdcode/buff-utils/-/buff-utils-1.7.1.tgz#00333fc450bc2a9b8aaec5dda608a2965e013ce5"
+  integrity sha512-1YBCnqIZtWEmd5Qi8Kbs1T8SQUsU6PbZzCEa8CJYmT9UfxS/nJsd1v8bwl9sVYeUYlJHIbTx6FO9jB3fDXh6tA==
 
-"@cmdcode/crypto-utils@^1.6.4":
-  version "1.6.4"
-  resolved "https://registry.yarnpkg.com/@cmdcode/crypto-utils/-/crypto-utils-1.6.4.tgz#55b4995a605bb0a732ec882c1add03ca807abc62"
-  integrity sha512-EF8nqFHFG9fWPa5MIykjDmem15QxZD4LWf1hnDgpgODX4c7pG8mf21sX7ucolqobq0+J4wOZuldYk6s9KLHoVg==
-  dependencies:
-    "@cmdcode/buff-utils" "^1.5.2"
-    "@cmdcode/secp256k1" "^1.0.7"
-
-"@cmdcode/secp256k1@^1.0.7":
-  version "1.0.7"
-  resolved "https://registry.yarnpkg.com/@cmdcode/secp256k1/-/secp256k1-1.0.7.tgz#5cfa3a6e8cacb67ce7b69d07c7538df3aadabab5"
-  integrity sha512-Os5BgDCqxYVw8e6w5oZ1PaNQBP6j1H/GceM+yIaz7XbGmM8KHWJhMEAy3tWjR/JHjWDJeXIs+a5T6+0OwAipTg==
+"@cmdcode/crypto-utils@^1.8.3":
+  version "1.8.3"
+  resolved "https://registry.yarnpkg.com/@cmdcode/crypto-utils/-/crypto-utils-1.8.3.tgz#afb1c3c2b20170a7166deee77d67fafcb8187dec"
+  integrity sha512-ktveBpl6C103EBIYIRW/28vtL4gYzwYofflS3G7PtPC0pIX1aBNWS2MTi+rJB/cjg8b8cZO1tbgh62sXVvf3QQ==
 
 "@cspotcode/source-map-support@^0.8.0":
   version "0.8.1"
@@ -2845,13 +2837,6 @@ through@2, through@^2.3.8, through@~2.3.4:
   resolved "https://registry.yarnpkg.com/through/-/through-2.3.8.tgz#0dd4c9ffaabc357960b1b724115d7e0e86a2e1f5"
   integrity sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg==
 
-tiny-secp256k1@^2.2.1:
-  version "2.2.1"
-  resolved "https://registry.yarnpkg.com/tiny-secp256k1/-/tiny-secp256k1-2.2.1.tgz#a61d4791b7031aa08a9453178a131349c3e10f9b"
-  integrity sha512-/U4xfVqnVxJXN4YVsru0E6t5wVncu2uunB8+RVR40fYUxkKYUPS10f+ePQZgFBoE/Jbf9H1NBveupF2VmB58Ng==
-  dependencies:
-    uint8array-tools "0.0.7"
-
 to-fast-properties@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/to-fast-properties/-/to-fast-properties-2.0.0.tgz#dc5e698cbd079265bc73e0377681a4e4e83f616e"
@@ -2947,11 +2932,6 @@ typescript@^4.9.4:
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.9.5.tgz#095979f9bcc0d09da324d58d03ce8f8374cbe65a"
   integrity sha512-1FXk9E2Hm+QzZQ7z+McJiHL4NW1F2EzMu9Nq9i3zAaGqibafqYwCVU6WyWAuyQRRzOlxou8xZSyXLEN8oKj24g==
-
-uint8array-tools@0.0.7:
-  version "0.0.7"
-  resolved "https://registry.yarnpkg.com/uint8array-tools/-/uint8array-tools-0.0.7.tgz#a7a2bb5d8836eae2fade68c771454e6a438b390d"
-  integrity sha512-vrrNZJiusLWoFWBqz5Y5KMCgP9W9hnjZHzZiZRT8oNAkq3d5Z5Oe76jAvVVSRh4U8GGR90N2X1dWtrhvx6L8UQ==
 
 unbox-primitive@^1.0.2:
   version "1.0.2"

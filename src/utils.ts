@@ -1,4 +1,4 @@
-import { Hash } from '@cmdcode/crypto-utils'
+import { Hash } from '@cmdcode/buff-utils'
 
 export async function tweakChain (
   chain : Uint8Array,
@@ -7,7 +7,7 @@ export async function tweakChain (
   /* Perform a SHA-512 operation on the provided key,
    * then an HMAC signing operation using the chain code.
    */
-    const I  = await Hash.hmac512(chain, data),
+    const I  = Hash.hmac512(chain, data),
           IL = I.slice(0, 32),
           IR = I.slice(32)
     // Return each half of the hashed result in an array.

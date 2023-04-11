@@ -1,6 +1,6 @@
-import { Field, Hash, SecretKey, Point, PublicKey } from '@cmdcode/crypto-utils'
-import { Buff, Bytes, Stream } from '@cmdcode/buff-utils'
-import { VersionData, Link }   from './types.js'
+import { SecretKey, PublicKey }      from '@cmdcode/crypto-utils'
+import { Buff, Bytes, Hash, Stream } from '@cmdcode/buff-utils'
+import { VersionData, Link } from './types.js'
 import * as Check from './check.js'
 import { getVersionData } from './version.js'
 import { incrementBuffer, tweakChain } from './utils.js'
@@ -131,7 +131,7 @@ export default class KeyLink {
       buffer.append(Buff.bytes(this.label))
     }
 
-    return buffer.tob58check()
+    return buffer.b58chk
   }
 
   toWIF (prefix : number = 0x80) : string {
@@ -139,7 +139,7 @@ export default class KeyLink {
      * as a WIF encoded Base58 string.
      */
     if (this.seckey !== undefined) {
-      return Buff.of(prefix, ...this.seckey, 0x01).tob58check()
+      return Buff.of(prefix, ...this.seckey, 0x01).b58chk
     }
     throw new TypeError('Cannot export a public key to WIF.')
   }
@@ -174,7 +174,7 @@ export default class KeyLink {
     if (seckey !== undefined) {
       // If private key exists, perform a scalar addition
       // operation to derive the child private key.
-      seckey = new Field(seckey).add(scalar)
+      seckey = new SecretKey(seckey).add(scalar)
       // If new key is invalid, increment buffer and ty again.
       if (!Check.privateKeyInRange(seckey)) {
         return this.derive(incrementBuffer(buffer), isHardened)
@@ -182,7 +182,7 @@ export default class KeyLink {
     } else {
       // Else public key exists, perform a point addition
       // operation to derive the child public key.
-      pubkey = new Point(pubkey).add(scalar).rawX
+      pubkey = new PublicKey(pubkey).add(scalar).x.raw
       // If new key is invalid, increment buffer and ty again.
       if (!Check.publicKeyOnCurve(pubkey)) {
         return this.derive(incrementBuffer(buffer), isHardened)
@@ -290,7 +290,7 @@ export default class KeyLink {
     /* Import a Base58 formatted string as a
      * BIP32 (extended) KeyLink object.
      */
-    const buffer = new Stream(Buff.b58check(b58string))
+    const buffer = new Stream(Buff.b58chk(b58string))
     const prefix = buffer.read(4).num
 
     const link : Link = {
@@ -340,7 +340,7 @@ export default class KeyLink {
   static async fromSeed (seed : Uint8Array | string) : Promise<KeyLink> {
     const raw = Buff.normalize(seed)
     const [ seckey, chaincode ] = await generateChain(raw)
-    return KeyLink.fromPrivateKey(new Field(seckey).raw, chaincode)
+    return KeyLink.fromPrivateKey(new SecretKey(seckey), chaincode)
   }
 }
 

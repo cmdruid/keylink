@@ -195,10 +195,10 @@
   resolved "https://registry.yarnpkg.com/@cmdcode/buff-utils/-/buff-utils-1.7.1.tgz#00333fc450bc2a9b8aaec5dda608a2965e013ce5"
   integrity sha512-1YBCnqIZtWEmd5Qi8Kbs1T8SQUsU6PbZzCEa8CJYmT9UfxS/nJsd1v8bwl9sVYeUYlJHIbTx6FO9jB3fDXh6tA==
 
-"@cmdcode/crypto-utils@^1.8.3":
-  version "1.8.3"
-  resolved "https://registry.yarnpkg.com/@cmdcode/crypto-utils/-/crypto-utils-1.8.3.tgz#afb1c3c2b20170a7166deee77d67fafcb8187dec"
-  integrity sha512-ktveBpl6C103EBIYIRW/28vtL4gYzwYofflS3G7PtPC0pIX1aBNWS2MTi+rJB/cjg8b8cZO1tbgh62sXVvf3QQ==
+"@cmdcode/crypto-utils@^1.9.0":
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/@cmdcode/crypto-utils/-/crypto-utils-1.9.0.tgz#a0ab557954e45620abc709898751c0de138ee0f4"
+  integrity sha512-epP4HfKVeDyfUAWNlcFgbAWSz03XCixVxnCFYXY73keX4RkC3n6MDifSTToON7UQvUH3bTzn8fvhKnhgBNbDlg==
 
 "@cspotcode/source-map-support@^0.8.0":
   version "0.8.1"

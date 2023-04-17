@@ -1,7 +1,7 @@
 {
   "name": "@cmdcode/keylink",
   "type": "module",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Derive keys from virtually anything. Extends the BIP32 wallet format to include many key types and features.",
   "author": "Christopher Scott",
   "license": "CC-BY-1.0",
@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@cmdcode/buff-utils": "^1.7.1",
-    "@cmdcode/crypto-utils": "^1.8.3",
+    "@cmdcode/crypto-utils": "^1.9.0",
     "@rollup/plugin-commonjs": "^23.0.2",
     "@rollup/plugin-json": "^5.0.1",
     "@rollup/plugin-node-resolve": "^15.0.1",

@@ -1,9 +1,9 @@
 import { Hash } from '@cmdcode/buff-utils'
 
-export async function tweakChain (
+export function tweakChain (
   chain : Uint8Array,
   data  : Uint8Array
-) : Promise<Uint8Array[]> {
+) : Uint8Array[] {
   /* Perform a SHA-512 operation on the provided key,
    * then an HMAC signing operation using the chain code.
    */

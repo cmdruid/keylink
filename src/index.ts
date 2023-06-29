@@ -1,8 +1,8 @@
-import { SecretKey, PublicKey }      from '@cmdcode/crypto-utils'
-import { Buff, Bytes, Hash, Stream } from '@cmdcode/buff-utils'
-import { VersionData, Link } from './types.js'
-import * as Check from './check.js'
-import { getVersionData } from './version.js'
+import { SecretKey, PublicKey }        from '@cmdcode/crypto-utils'
+import { Buff, Bytes, Hash, Stream }   from '@cmdcode/buff-utils'
+import { VersionData, Link }           from './types.js'
+import * as Check                      from './check.js'
+import { getVersionData }              from './version.js'
 import { incrementBuffer, tweakChain } from './utils.js'
 
 const ec = new TextEncoder()
@@ -119,13 +119,14 @@ export default class KeyLink {
     const key = (this.seckey !== undefined)
       ? Buff.of(0x00, ...this.seckey)
       : this.pubkey.raw
-    const buffer = Buff.of(
-      ...Buff.num(this.prefix, 4),
-      ...Buff.num(this.depth,  1),
-      ...Buff.num(this.marker, 4),
-      ...Buff.num(this.index,  4),
-      ...this.chaincode, ...key
-    )
+    const buffer = Buff.join([
+      Buff.num(this.prefix, 4),
+      Buff.num(this.depth,  1),
+      Buff.num(this.marker, 4),
+      Buff.num(this.index,  4),
+      this.chaincode,
+      key
+    ])
 
     if (this.label !== undefined) {
       buffer.append(Buff.bytes(this.label))
@@ -144,10 +145,10 @@ export default class KeyLink {
     throw new TypeError('Cannot export a public key to WIF.')
   }
 
-  async derive (
+  derive (
     tweak : Uint8Array,
     isHardened = false
-  ) : Promise<KeyLink> {
+  ) : KeyLink {
     /* Derive a new key and chain code from the
      * current link, using the encoded path data,
      */
@@ -169,7 +170,7 @@ export default class KeyLink {
       : Uint8Array.of(...pubkey, ...tweak)
 
     // Derive a new tweak and chaincode from the buffer.
-    const [ scalar, code ] = await tweakChain(this.chaincode, buffer)
+    const [ scalar, code ] = tweakChain(this.chaincode, buffer)
 
     if (seckey !== undefined) {
       // If private key exists, perform a scalar addition
@@ -191,45 +192,45 @@ export default class KeyLink {
   return new KeyLink({ config: this._config, seckey, pubkey, code, index, depth: this.depth + 1, marker, label })
 }
 
-  async getPubIndex (index : number) : Promise<KeyLink> {
+  getPublicIndex (index : number) : KeyLink {
     /* Derive a path index using an standard number value. */
     Check.indexInRange(index)
     const bytes = Buff.num(index, 4)
     return this.derive(bytes, false)
   }
 
-  async getSecIndex (index : number) : Promise<KeyLink> {
+  getSecretIndex (index : number) : KeyLink {
     /* Derive a path index using a hardened number value. */
     Check.indexInRange(index)
     const bytes = Buff.num(index + 0x80000000, 4)
     return this.derive(bytes, true)
   }
 
-  async getPubHash (hash : Bytes) : Promise<KeyLink> {
+  getPublicHash (hash : Bytes) : KeyLink {
     /* Derive a path index using a standard byte-array value. */
     const bytes = Buff.bytes(hash)
     return this.derive(Buff.of(0x01, ...bytes), false)
   }
 
-  async getSecHash (hash : Bytes) : Promise<KeyLink> {
+  getSecretHash (hash : Bytes) : KeyLink {
     /* Derive a path index using a hardened byte-array value. */
     const bytes = Buff.bytes(hash)
     return this.derive(Buff.of(0x00, ...bytes), true)
   }
 
-  async getPubLabel (label : string) : Promise<KeyLink> {
+  getPublicLabel (label : string) : KeyLink {
     /* Derive a path index using a standard byte-array value. */
     const bytes = Buff.str(label).digest
     return this.derive(Buff.of(0x01, ...bytes), false)
   }
 
-  async getSecLabel (label : string) : Promise<KeyLink> {
+  getSecretLabel (label : string) : KeyLink {
     /* Derive a path index using a hardened byte-array value. */
     const bytes = Buff.str(label).digest
     return this.derive(Buff.of(0x00, ...bytes), true)
   }
 
-  async getPath (fullpath : string) : Promise<KeyLink> {
+  getPath (fullpath : string) : KeyLink {
     /* Split a given path string into an array of indices,
      * then parse and derive each child KeyLink in the array.
      */
@@ -269,15 +270,15 @@ export default class KeyLink {
           ? Buff.hex(path)
           : Buff.str(path).digest
         self = (isHardened)
-          ? await self.getSecHash(hash)
-          : await self.getPubHash(hash)
+          ? self.getSecretHash(hash)
+          : self.getPublicHash(hash)
       } else {
         // Handle the index as an integer value.
         Check.isValidIndex(path)
         const index = parseInt(path, 10)
         self = (isHardened)
-          ? await self.getSecIndex(index)
-          : await self.getPubIndex(index)
+          ? self.getSecretIndex(index)
+          : self.getPublicIndex(index)
       }
     }
     // Return the fully-derived KeyLink object.
@@ -337,18 +338,18 @@ export default class KeyLink {
     return new KeyLink({ pubkey, code })
   }
 
-  static async fromSeed (seed : Uint8Array | string) : Promise<KeyLink> {
+  static fromSeed (seed : Uint8Array | string) : KeyLink {
     const raw = Buff.normalize(seed)
-    const [ seckey, chaincode ] = await generateChain(raw)
+    const [ seckey, chaincode ] = generateChain(raw)
     return KeyLink.fromPrivateKey(new SecretKey(seckey), chaincode)
   }
 }
 
-async function generateChain (
+function generateChain (
   key  : Uint8Array,
   seed : Uint8Array = ec.encode('Bitcoin seed')
-) : Promise<[ Uint8Array, Uint8Array ]> {
+) : [ Uint8Array, Uint8Array ] {
   Check.seedLengthIsValid(key.length)
-  const hash = await Hash.hmac512(seed, key)
+  const hash = Hash.hmac512(seed, key)
   return [ hash.slice(0, 32), hash.slice(32) ]
 }
